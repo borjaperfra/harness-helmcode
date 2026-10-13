@@ -1,0 +1,49 @@
+{
+  "name": "@deepseek-ai/dsh-privacy-helmcode",
+  "description": "Redaccion reversible de PII espanola para el DeepSeek Harness: detectores con checksum real, mapa determinista persistible y sellado cifrado con fallo cerrado",
+  "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/686f6c61/harness-helmcode.git",
+    "directory": "packages/guard/privacy-helmcode"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./detect": {
+      "types": "./lib/types/detect.d.ts",
+      "default": "./lib/types/detect.js"
+    },
+    "./map": {
+      "types": "./lib/types/map.d.ts",
+      "default": "./lib/types/map.js"
+    },
+    "./redact": {
+      "types": "./lib/types/redact.d.ts",
+      "default": "./lib/types/redact.js"
+    },
+    "./seal": {
+      "types": "./lib/types/seal.d.ts",
+      "default": "./lib/types/seal.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/types/**/*.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "peerDependencies": {},
+  "dependencies": {},
+  "devDependencies": {}
+}

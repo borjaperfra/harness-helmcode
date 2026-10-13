@@ -397,6 +397,7 @@
     { "path": "./packages/spill/spill-policy" },
     { "path": "./packages/guard/timeout-policy" },
     { "path": "./packages/guard/eu-routing" },
+    { "path": "./packages/guard/privacy-helmcode" },
     { "path": "./packages/runtime-diagnostics/invariants" },
     { "path": "./packages/test-support/agent-loop-testkit" },
     { "path": "./packages/acp/acp" },
