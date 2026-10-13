@@ -114,3 +114,24 @@
     # Helmcode identity: brand token layer, brand sheet and the kit's lockup.
     - id: ui-brand-helmcode
       name: '@deepseek-ai/dsh-client-ui-brand-helmcode'
+
+    # Guardia de residencia y de egreso. Veta en el waterfall `llm/stream` toda
+    # ruta de modelo que no sea europea y, en `tools/pre-execute`, las
+    # herramientas que abren su propio trafico (subagentes externos, servidores
+    # MCP, `web_fetch`, `web_search`), que no pasan por ese waterfall.
+    #
+    # `mode: 'open'` es lo que corresponde a ESTE bundle: el modo es una decision
+    # de DESPLIEGUE, y quien la toma es el perfil del cliente —es su tratamiento
+    # del dato—, no un paquete compartido. Un cliente regulado pone `'eu-only'` en
+    # su propio `cordis.patch.yml` (o en la fila de su perfil), que es donde se
+    # declara el despliegue; aqui no se puede imponer, porque este bundle tambien
+    # sirve a la maquina de desarrollo, que no es un despliegue regulado, y un
+    # `eu-only` por defecto romperia rutas legitimas que no estan en la tabla de
+    # residencia.
+    #
+    # No va en los `presets`: la guardia no es una herramienta del turno (el
+    # modelo no la invoca), es un plugin del pipeline.
+    - id: guard-eu-routing
+      name: '@deepseek-ai/dsh-guard-eu-routing'
+      config:
+        mode: 'open'

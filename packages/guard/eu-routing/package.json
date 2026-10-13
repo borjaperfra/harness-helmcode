@@ -1,0 +1,52 @@
+{
+  "name": "@deepseek-ai/dsh-guard-eu-routing",
+  "description": "Residency and egress guard for the DeepSeek Harness: which model routes may leave the EU, which tools carry their own egress outside the llm/stream waterfall, and why the guard refuses instead of degrading or asking in silence",
+  "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/686f6c61/harness-helmcode.git",
+    "directory": "packages/guard/eu-routing"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./decisions": {
+      "types": "./lib/types/decisions.d.ts",
+      "default": "./lib/types/decisions.js"
+    },
+    "./defaults": {
+      "types": "./lib/types/defaults.d.ts",
+      "default": "./lib/types/defaults.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/types/**/*.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@deepseek-ai/schemastery": "workspace:~"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-llm": "workspace:*",
+    "@deepseek-ai/dsh-tools": "workspace:*",
+    "@deepseek-ai/cordis": "workspace:~"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-llm": "workspace:*",
+    "@deepseek-ai/dsh-system-prompt": "workspace:*",
+    "@deepseek-ai/dsh-tools": "workspace:*",
+    "@deepseek-ai/cordis": "workspace:~"
+  }
+}

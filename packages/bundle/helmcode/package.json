@@ -35,6 +35,7 @@
   },
   "dependencies": {
     "@deepseek-ai/dsh-client-ui-brand-helmcode": "workspace:*",
+    "@deepseek-ai/dsh-guard-eu-routing": "workspace:*",
     "@deepseek-ai/dsh-llm-pi-ai": "workspace:*"
   },
   "peerDependencies": {
