@@ -21,12 +21,13 @@
 
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import * as yaml from 'js-yaml'
 import { buildEvidenceReport, GENERATOR_NAME } from './report.ts'
 import { dumpRows, TELEMETRY_PLUGIN_NAME } from './sections.ts'
-import type { DumpRecord, DumpRow, EvidenceInput, Residency, ResidencyTable, TelemetryEvidence } from './sections.ts'
+import type { DumpRecord, DumpRow, EvidenceInput, RedactionEvidence, Residency, ResidencyTable, TelemetryEvidence } from './sections.ts'
 
 /** Texto de uso que acompaña a cualquier error de argumentos. */
 export const USAGE =
@@ -49,6 +50,13 @@ const DUMP_SCHEMA = yaml.JSON_SCHEMA.extend([
 
 /** El id que el roster de Desktop usa para inyectar la fila de telemetría. */
 const TELEMETRY_ROW_ID = 'session-telemetry-otel'
+
+/** El id y el plugin de la fila del canal de redacción. */
+const PRIVACY_ROW_ID = 'privacy-helmcode'
+const PRIVACY_PLUGIN_NAME = '@deepseek-ai/dsh-privacy-helmcode'
+
+/** Los segmentos, bajo el home del harness, de la ruta por defecto del mapa sellado. */
+const DEFAULT_MAP_SEGMENTS: readonly string[] = ['privacy', 'map.v1']
 
 function isRecord(value: unknown): value is DumpRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -194,6 +202,33 @@ export function telemetryEvidence(rows: readonly DumpRow[], checkedAt: string): 
   }
 }
 
+/**
+ * Determina el estado del canal de redacción a partir del volcado y resuelve las
+ * rutas que un volcado no puede traer.
+ *
+ * El método declara sus propios límites: la fila se busca por barrido, y el home
+ * del harness se resuelve en la máquina que ejecuta el generador, no en el
+ * despliegue que produjo el volcado. Los dos datos se imprimen etiquetados.
+ * @param rows - filas del volcado.
+ * @param home - home del harness ya resuelto; por defecto el de esta máquina.
+ * @returns la evidencia del canal que imprime la sección 6.
+ */
+export function redactionEvidence(
+  rows: readonly DumpRow[],
+  home: string = resolveDshHome(),
+): RedactionEvidence {
+  const matches = rows.filter(row => row.name === PRIVACY_PLUGIN_NAME || row.id === PRIVACY_ROW_ID)
+  const mounted = matches.some(row => row.disabled !== true)
+  const method = `barrido del volcado buscando la fila del canal de redacción (\`${PRIVACY_PLUGIN_NAME}\`, id \`${PRIVACY_ROW_ID}\`): ${matches.length} fila(s), ${matches.filter(row => row.disabled !== true).length} sin \`disabled: true\``
+  return {
+    mounted,
+    method: `${method}.`,
+    resolvedHome: home,
+    defaultMapPath: join(home, ...DEFAULT_MAP_SEGMENTS),
+    rows: matches.map(row => row.id),
+  }
+}
+
 /** Versión del generador, leída del `package.json` del paquete. */
 export function generatorVersion(): string {
   const document: unknown = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
@@ -254,13 +289,15 @@ export function main(argv: readonly string[] = process.argv.slice(2)): number {
       parsed.provider === undefined ? {} : { provider: parsed.provider },
     )
     const now = new Date().toISOString()
+    const rows = dumpRows(dump)
     const input: EvidenceInput = {
       dump,
       residency,
       generatedAt: now,
       generatorVersion: generatorVersion(),
       dumpSha256: createHash('sha256').update(dumpBytes).digest('hex'),
-      telemetry: telemetryEvidence(dumpRows(dump), now),
+      telemetry: telemetryEvidence(rows, now),
+      redaction: redactionEvidence(rows),
     }
     process.stdout.write(buildEvidenceReport(input))
     return 0

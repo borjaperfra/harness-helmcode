@@ -31,11 +31,14 @@
     "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
-  "peerDependencies": {},
+  "peerDependencies": {
+    "@deepseek-ai/dsh-home-paths": "workspace:*"
+  },
   "dependencies": {
     "js-yaml": "^4.2.0"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-home-paths": "workspace:*",
     "@types/js-yaml": "^4.0.9",
     "vitest": "^4.1.8"
   }

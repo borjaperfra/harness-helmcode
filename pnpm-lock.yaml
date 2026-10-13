@@ -2198,6 +2198,9 @@ importers:
       '@deepseek-ai/dsh-llm-pi-ai':
         specifier: workspace:*
         version: link:../../llm/llm-pi-ai
+      '@deepseek-ai/dsh-privacy-helmcode':
+        specifier: workspace:*
+        version: link:../../guard/privacy-helmcode
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:~
@@ -8618,6 +8621,43 @@ importers:
         specifier: workspace:*
         version: link:../../core/tools
 
+  packages/guard/privacy-helmcode:
+    dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-atomic-write':
+        specifier: workspace:*
+        version: link:../../util/atomic-write
+      '@deepseek-ai/dsh-credentials':
+        specifier: workspace:*
+        version: link:../../credentials/credentials
+      '@deepseek-ai/dsh-credentials-local':
+        specifier: workspace:*
+        version: link:../../credentials/credentials-local
+      '@deepseek-ai/dsh-fs':
+        specifier: workspace:*
+        version: link:../../fs/fs
+      '@deepseek-ai/dsh-fs-local':
+        specifier: workspace:*
+        version: link:../../fs/fs-local
+      '@deepseek-ai/dsh-home-paths':
+        specifier: workspace:*
+        version: link:../../util/home-paths
+      '@deepseek-ai/dsh-llm':
+        specifier: workspace:*
+        version: link:../../llm/llm
+      '@deepseek-ai/dsh-system-prompt':
+        specifier: workspace:*
+        version: link:../../core/system-prompt
+      '@deepseek-ai/dsh-tools':
+        specifier: workspace:*
+        version: link:../../core/tools
+
   packages/guard/repeat-tool-reminder:
     dependencies:
       '@deepseek-ai/schemastery':
@@ -8780,6 +8820,9 @@ importers:
         specifier: ^4.2.0
         version: 4.3.1
     devDependencies:
+      '@deepseek-ai/dsh-home-paths':
+        specifier: workspace:*
+        version: link:../../util/home-paths
       '@types/js-yaml':
         specifier: ^4.0.9
         version: 4.0.9

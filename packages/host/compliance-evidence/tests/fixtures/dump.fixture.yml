@@ -25,6 +25,9 @@
 #   `mcp-files-server` es un ejecutable inventado para el fixture.
 # - La fila `guard-eu-routing`: el paquete se está aterrizando en paralelo y su
 #   forma aquí es la del contrato del brief (`config.mode`).
+# - La fila `privacy-helmcode`: su forma es la que el corte de cableado declara
+#   en `packages/bundle/helmcode/cordis.patch.yml` (`ttlDays: 30`), sin `mapPath`
+#   ni `mapKeyRef`, que es como queda cuando el perfil no los fija.
 #
 # La tabla de residencia que usan los tests omite A PROPÓSITO
 # `helmcode/glm5.3-flash` para ejercitar el camino `unknown`: esa ausencia es del
@@ -73,6 +76,15 @@
   name: '@deepseek-ai/dsh-guard-eu-routing'
   config:
     mode: eu-only
+# == @deepseek-ai/dsh-helmcode
+# La fila del canal de redaccion, con la forma que declara el bundle
+# (`packages/bundle/helmcode/cordis.patch.yml`: `ttlDays: 30` y ninguna clave,
+# porque la clave vive en el credential store). `mapPath` NO se declara a
+# proposito: asi el fixture ejercita la ruta por defecto que resuelve la CLI.
+- id: privacy-helmcode
+  name: '@deepseek-ai/dsh-privacy-helmcode'
+  config:
+    ttlDays: 30
 # == @deepseek-ai/dsh-base
 - id: session-persistence-jsonl
   name: '@deepseek-ai/dsh-session-persistence-jsonl'

@@ -1,5 +1,5 @@
 /**
- * Las ocho secciones del informe de evidencia: funciones puras, sin imports del
+ * Las nueve secciones del informe de evidencia: funciones puras, sin imports del
  * harness, sin red y sin disco, para que cada una se pueda probar por separado
  * sobre un volcado ya parseado.
  *
@@ -44,6 +44,26 @@ export interface TelemetryEvidence {
   readonly rows?: readonly string[]
 }
 
+/**
+ * Los datos del canal de redacción que la CLI aporta porque el volcado no los
+ * puede traer: la composición declara dónde vive el mapa sellado —o no lo
+ * declara, y entonces rige el valor por defecto del plugin—, pero ese valor por
+ * defecto es relativo al home del harness, y un volcado de configuración no
+ * declara el home del proceso ni variables de entorno.
+ */
+export interface RedactionEvidence {
+  /** Si el volcado declara la fila del canal de redacción y ésta no está deshabilitada. */
+  readonly mounted: boolean
+  /** Cómo se comprobó, en texto libre; se imprime literal en el informe. */
+  readonly method: string
+  /** Home del harness resuelto en la máquina que generó el informe, no en el despliegue. */
+  readonly resolvedHome: string
+  /** Ruta por defecto del mapa sellado bajo ese home (`privacy/map.v1`). */
+  readonly defaultMapPath: string
+  /** Filas del volcado relacionadas con el canal, si la CLI encontró alguna. */
+  readonly rows?: readonly string[]
+}
+
 /** La entrada completa del informe. */
 export interface EvidenceInput {
   /** El volcado compuesto ya parseado; lo parsea la CLI, no este módulo. */
@@ -58,6 +78,8 @@ export interface EvidenceInput {
   readonly dumpSha256: string
   /** Estado de la telemetría. */
   readonly telemetry: TelemetryEvidence
+  /** Estado del canal de redacción y las rutas que la CLI puede resolver. */
+  readonly redaction: RedactionEvidence
 }
 
 /* ------------------------------------------------------------------ */
@@ -85,13 +107,14 @@ export interface DumpRow {
   readonly value: DumpRecord
 }
 
-/** Títulos de las ocho secciones, en el orden obligatorio del informe. */
+/** Títulos de las nueve secciones, en el orden obligatorio del informe. */
 export const SECTION_TITLES = [
   'Qué es este documento',
   'Rutas de inferencia declaradas',
   'Modo de residencia configurado',
   'Inventario de canales de salida',
   'Superficie de datos local',
+  'Canal de redacción',
   'Requisito de despliegue',
   'Inventario de plugins',
   'Huella',
@@ -100,6 +123,10 @@ export const SECTION_TITLES = [
 const LLM_PI_AI = '@deepseek-ai/dsh-llm-pi-ai'
 const GUARD_ID = 'guard-eu-routing'
 const GUARD_NAME = '@deepseek-ai/dsh-guard-eu-routing'
+const PRIVACY_ID = 'privacy-helmcode'
+const PRIVACY_NAME = '@deepseek-ai/dsh-privacy-helmcode'
+/** La referencia de credencial por defecto de la clave del mapa sellado. */
+const PRIVACY_DEFAULT_KEY_REF = 'PRIVACY_MAP_KEY'
 const MCP_CLIENT = '@deepseek-ai/dsh-mcp-client'
 const WEB_PLUGIN = '@deepseek-ai/dsh-web'
 const WEB_SEARCH_PREFIX = '@deepseek-ai/dsh-web-search-'
@@ -146,7 +173,11 @@ export function renderValue(value: unknown): string {
   if (value === null) return 'null'
   if (typeof value === 'string') return value
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-  return JSON.stringify(value) ?? String(value)
+  // `JSON.stringify` devuelve `undefined` para un valor sin forma JSON (una
+  // función, un símbolo) y su tipo declarado no lo dice: ese caso se nombra aquí
+  // en vez de dejar que una conversión genérica imprima `[object Object]`.
+  if (typeof value === 'function' || typeof value === 'symbol') return String(value)
+  return JSON.stringify(value)
 }
 
 /**
@@ -847,10 +878,118 @@ export function sectionLocalDataSurface(input: EvidenceInput): string {
 }
 
 /* ------------------------------------------------------------------ */
-/* 6. Requisito de despliegue                                         */
+/* 6. Canal de redaccion                                              */
 /* ------------------------------------------------------------------ */
 
-/** Sección 6: para attestar egreso hace falta control de salida del despliegue. */
+/**
+ * Sección 6: lee la fila `privacy-helmcode` del volcado y declara el compromiso
+ * que ese canal acepta —lo que sale hacia el modelo lleva marcadores y el
+ * ORIGINAL se queda en el log local—, dónde vive el mapa sellado, que la
+ * restauración es manual y qué hace el canal cuando el mapa no se puede abrir.
+ */
+export function sectionRedactionChannel(input: EvidenceInput): string {
+  const rows = dumpRows(input.dump)
+  const channel = rows.find(row => row.id === PRIVACY_ID || row.name === PRIVACY_NAME)
+  const lines: string[] = []
+  if (channel === undefined) {
+    lines.push(
+      `**La fila \`${PRIVACY_ID}\` NO aparece en el volcado compuesto.** Esta composición no monta el canal de`,
+    )
+    lines.push(
+      'redacción: no hay ninguna herramienta con la que el agente sustituya datos personales, así que lo que el',
+    )
+    lines.push('agente escriba o lea sale hacia el modelo tal cual. Se dice aquí, en vez de callarse.')
+    lines.push('')
+    lines.push(
+      `_Si el canal se montara sin declarar \`mapPath\`, el mapa sellado viviría en \`${input.redaction.defaultMapPath}\`: el home del harness resuelto en la máquina que generó este informe._`,
+    )
+    return lines.join('\n')
+  }
+  const config = isRecord(channel.config) ? channel.config : {}
+  const declaredMapPath = asString(config['mapPath'])
+  const declaredKeyRef = asString(config['mapKeyRef'])
+  const ttlDays = typeof config['ttlDays'] === 'number' ? config['ttlDays'] : undefined
+  const mounted = channel.disabled !== true
+
+  lines.push(`Fila \`${channel.id}\` (plugin \`${channel.name}\`), estado: ${rowState(channel.disabled)}.`)
+  lines.push('')
+  lines.push(
+    list([
+      `Canal montado: ${mounted ? '**sí**' : '**no** — la fila está deshabilitada, así que las dos herramientas no se publican'}; comprobado en: \`${input.redaction.method}\``,
+      declaredMapPath === undefined
+        ? `Mapa sellado: la fila **no declara \`mapPath\`**, así que rige el valor por defecto del plugin bajo el home del harness: \`${input.redaction.defaultMapPath}\``
+        : `Mapa sellado: \`${declaredMapPath}\` (declarado en la fila)`,
+      declaredKeyRef === undefined
+        ? `Clave del mapa: la fila **no declara \`mapKeyRef\`**, así que la referencia es \`${PRIVACY_DEFAULT_KEY_REF}\`; su valor no está en el volcado ni en el patch del bundle, sino en el almacén de credenciales local (sección 5)`
+        : `Clave del mapa: \`${declaredKeyRef}\` (declarada en la fila); su valor no está en el volcado ni en el patch del bundle, sino en el almacén de credenciales local (sección 5)`,
+      `Caducidad de las entradas nuevas: ${ttlDays === undefined ? 'no declarada — las entradas no caducan' : `\`ttlDays: ${String(ttlDays)}\` días`}`,
+      'Herramientas del canal: `anonymize` (texto que pasa el agente) y `workspace_read_anonymized` (fichero de texto leído a través del seam de ficheros de la composición).',
+    ]),
+  )
+  lines.push('')
+  lines.push(
+    `El home del harness se resolvió en la **máquina que generó este informe**: \`${input.redaction.resolvedHome}\`.`,
+  )
+  lines.push(
+    'Un volcado de configuración no declara el home del proceso ni variables de entorno, así que si el volcado se',
+  )
+  lines.push('capturó en otra máquina esa ruta describe al generador, no al despliegue.')
+  lines.push('')
+  lines.push('**Qué queda en claro, y dónde**')
+  lines.push('')
+  lines.push(
+    list([
+      'la CAPACIDAD ES EXPLÍCITA: no hay interceptor de contenido. El agente redacta cuando usa una de las dos herramientas, y todo lo que no pase por ellas —lo que escriba, lo que lea con otras herramientas, lo que decida no pasar— sale hacia el modelo sin sustitución;',
+      'el LOG LOCAL DE LA SESIÓN guarda el original: los argumentos de `anonymize` llevan el texto sin redactar, y `workspace_read_anonymized` no modifica el fichero, que sigue en disco tal cual. Lo que se despacha al modelo lleva marcadores (`[DNI_1]`, `[IBAN_2]`, …), no valores;',
+      'la exportación del log (sección 5) entrega ese mismo contenido completo y sin redacción;',
+      'el mapa es reversible por diseño —guarda valor → marcador, sellado con AES-256-GCM— y su CLAVE vive en el almacén de credenciales local que la sección 5 declara **en claro**: la confidencialidad del mapa descansa en ese fichero, no en el volcado;',
+      'las entradas caducadas dejan de restaurarse (el mapa lo niega), pero su marcador sigue en el historial: no hay reescritura del pasado;',
+      'el mismo valor produce siempre el mismo marcador mientras viva el mapa, también entre sesiones, porque el mapa persiste en el fichero sellado.',
+    ]),
+  )
+  lines.push('')
+  lines.push('**Restauración: manual**')
+  lines.push('')
+  lines.push(
+    'No hay ninguna herramienta que devuelva los valores. Restaurar exige la clave y el mapa sellado, y lo hace un',
+  )
+  lines.push(
+    'operador fuera del canal del modelo (el propio paquete expone `open` y `restoreText` para ese trabajo). El',
+  )
+  lines.push('informe no puede comprobar que ese trabajo se haga ni quién lo hace.')
+  lines.push('')
+  lines.push('**Fallo cerrado**')
+  lines.push('')
+  lines.push(
+    'Si la clave no está en el almacén, si el sobre no descifra o si el mapa no se puede leer, las dos herramientas',
+  )
+  lines.push(
+    'FALLAN y no devuelven el texto sin redactar. Un fallo al persistir el mapa también hace fallar la llamada: un',
+  )
+  lines.push('marcador sin mapa guardado no tendría vuelta.')
+  lines.push('')
+  lines.push(
+    '**Lo que este canal NO cubre:** lo que el agente no pase por las herramientas; los datos que sus detectores no',
+  )
+  lines.push(
+    'reconozcan (son conservadores: prefieren perder una coincidencia antes que sustituir algo que no validaron); el',
+  )
+  lines.push(
+    'contenido que otras herramientas envíen al modelo; y el log local con su exportación, que quedan como se declara',
+  )
+  lines.push('arriba.')
+  lines.push('')
+  lines.push(
+    '_Alcance: esto es lo que el volcado declara y lo que la CLI pudo resolver en la máquina del generador. El informe no comprueba que el plugin esté cargado en tiempo de ejecución, ni que la clave exista, ni que el mapa se pueda abrir._',
+  )
+  return lines.join('\n')
+}
+
+/* ------------------------------------------------------------------ */
+/* 7. Requisito de despliegue                                         */
+/* ------------------------------------------------------------------ */
+
+/** Sección 7: para attestar egreso hace falta control de salida del despliegue. */
 export function sectionDeploymentRequirement(input: EvidenceInput): string {
   const rows = dumpRows(input.dump)
   const hasProxyPlugin = rows.some(row => row.name === '@deepseek-ai/dsh-http-proxy')
@@ -886,10 +1025,10 @@ export function sectionDeploymentRequirement(input: EvidenceInput): string {
 }
 
 /* ------------------------------------------------------------------ */
-/* 7. Inventario de plugins                                           */
+/* 8. Inventario de plugins                                           */
 /* ------------------------------------------------------------------ */
 
-/** Sección 7: todas las filas del volcado con `id`, `name` y estado. */
+/** Sección 8: todas las filas del volcado con `id`, `name` y estado. */
 export function sectionPluginInventory(input: EvidenceInput): string {
   const rows = dumpRows(input.dump)
   const lines: string[] = []
@@ -913,10 +1052,10 @@ export function sectionPluginInventory(input: EvidenceInput): string {
 }
 
 /* ------------------------------------------------------------------ */
-/* 8. Huella                                                          */
+/* 9. Huella                                                          */
 /* ------------------------------------------------------------------ */
 
-/** Sección 8: fecha, versión y hash de entrada para reproducibilidad. */
+/** Sección 9: fecha, versión y hash de entrada para reproducibilidad. */
 export function sectionFingerprint(input: EvidenceInput): string {
   return [
     list([
@@ -935,7 +1074,7 @@ export function sectionFingerprint(input: EvidenceInput): string {
 /* Composición                                                        */
 /* ------------------------------------------------------------------ */
 
-/** Las ocho secciones en el orden obligatorio, cada una con su título numerado. */
+/** Las nueve secciones en el orden obligatorio, cada una con su título numerado. */
 export function buildSections(input: EvidenceInput): readonly string[] {
   const bodies = [
     sectionWhatThisIs(input),
@@ -943,6 +1082,7 @@ export function buildSections(input: EvidenceInput): readonly string[] {
     sectionResidencyMode(input),
     sectionEgressChannels(input),
     sectionLocalDataSurface(input),
+    sectionRedactionChannel(input),
     sectionDeploymentRequirement(input),
     sectionPluginInventory(input),
     sectionFingerprint(input),

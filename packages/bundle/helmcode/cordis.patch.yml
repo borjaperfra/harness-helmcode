@@ -1,5 +1,6 @@
-# The Helmcode layer as its own profile bundle: the brand skin and the European
-# inference route, inserted over the composition `dsh-web-app` leaves behind.
+# The Helmcode layer as its own profile bundle: the brand skin, the European
+# inference route, the residency and egress guard, and the PII redaction
+# channel, inserted over the composition `dsh-web-app` leaves behind.
 # `PROFILE_TEMPLATES.web` stacks this bundle after `dsh-web-app`, so both rows
 # join the same roster without a Helmcode line in any upstream patch file.
 
@@ -135,3 +136,19 @@
       name: '@deepseek-ai/dsh-guard-eu-routing'
       config:
         mode: 'open'
+
+    # Canal de redaccion de PII. Es una CAPACIDAD EXPLICITA (plan §18): no hay
+    # interceptor, el agente redacta cuando usa `anonymize` o
+    # `workspace_read_anonymized`. El mapa que hace reversible la redaccion vive
+    # entre sesiones, sellado con AES-256-GCM, en `<DSH_HOME>/privacy/map.v1`
+    # por defecto; `ttlDays: 30` acota la caducidad de las entradas nuevas.
+    #
+    # La CLAVE del mapa NO se declara aqui: este fichero es un patch compartido y
+    # en claro, y una clave en el seria una clave publicada. Vive en el credential
+    # store bajo la referencia `PRIVACY_MAP_KEY` (el campo `mapKeyRef` existe para
+    # apuntar a otra). Sin esa credencial las dos herramientas fallan en vez de
+    # devolver texto sin redactar, que es el lado fail-closed del diseno.
+    - id: privacy-helmcode
+      name: '@deepseek-ai/dsh-privacy-helmcode'
+      config:
+        ttlDays: 30

@@ -2,7 +2,7 @@
  * Detectores de PII espanola con checksum real.
  *
  * Nucleo PURO: sin `apply()`, sin `Config`, sin `ctx` y sin herramientas. Nada
- * de este fichero conoce el runtime; el cableado llega despues, en la parte B.
+ * de este fichero conoce el runtime; el cableado vive en `index.ts`.
  *
  * Cada detector que afirma un checksum lo CALCULA aqui: la letra del DNI/NIE se
  * deriva del mod-23 sobre `TRWAGMYFPDXBNJZSQVHLCKE`, el IBAN se valida con el

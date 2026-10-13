@@ -11,13 +11,24 @@
  */
 
 import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { decodeDumpBytes, parseArguments, parseConfigDump, residencyFromCatalog, telemetryEvidence } from '../src/cli.ts'
-import { SECTION_TITLES, buildEvidenceReport, dumpRows, residencyOf } from '../src/index.ts'
+import {
+  decodeDumpBytes,
+  parseArguments,
+  parseConfigDump,
+  redactionEvidence,
+  residencyFromCatalog,
+  telemetryEvidence,
+} from '../src/cli.ts'
+import { SECTION_TITLES, buildEvidenceReport, dumpRows, renderValue, residencyOf } from '../src/index.ts'
 import type { DumpRecord, EvidenceInput, ResidencyTable } from '../src/index.ts'
 
 const DUMP_TEXT = readFileSync(new URL('./fixtures/dump.fixture.yml', import.meta.url), 'utf8')
 const DUMP = parseConfigDump(DUMP_TEXT)
+
+/** El home con el que el test finge la máquina del generador. */
+const RESOLVED_HOME = join('machine', 'home')
 
 /**
  * La tabla de residencia del test. Se omite a propósito
@@ -43,6 +54,7 @@ function baseInput(dump: unknown = DUMP): EvidenceInput {
       checkedAt: '2026-01-02T03:04:05.000Z',
       method: 'barrido del fixture',
     },
+    redaction: redactionEvidence(dumpRows(dump), RESOLVED_HOME),
   }
 }
 
@@ -50,14 +62,18 @@ function cloneDump(): unknown {
   return structuredClone(DUMP)
 }
 
-function guardConfig(dump: unknown): DumpRecord {
-  const row = dumpRows(dump).find(candidate => candidate.id === 'guard-eu-routing')
-  if (row === undefined) throw new Error('el fixture debería traer la fila de la guardia')
+function rowConfig(dump: unknown, id: string): DumpRecord {
+  const row = dumpRows(dump).find(candidate => candidate.id === id)
+  if (row === undefined) throw new Error(`el fixture debería traer la fila ${id}`)
   const config = row.config
   if (typeof config !== 'object' || config === null || Array.isArray(config)) {
-    throw new Error('la fila de la guardia debería traer un `config` de objeto')
+    throw new Error(`la fila ${id} debería traer un \`config\` de objeto`)
   }
   return config as DumpRecord
+}
+
+function guardConfig(dump: unknown): DumpRecord {
+  return rowConfig(dump, 'guard-eu-routing')
 }
 
 function dumpWithMode(mode: string): unknown {
@@ -71,8 +87,14 @@ function dumpWithoutGuard(): unknown {
   return (dump as readonly unknown[]).filter(entry => (entry as DumpRecord)['id'] !== 'guard-eu-routing')
 }
 
+/** El volcado sin la fila del canal de redacción. */
+function dumpWithoutRedaction(): unknown {
+  const dump = cloneDump()
+  return (dump as readonly unknown[]).filter(entry => (entry as DumpRecord)['id'] !== 'privacy-helmcode')
+}
+
 describe('buildEvidenceReport', () => {
-  it('incluye las ocho secciones obligatorias, en orden', () => {
+  it('incluye las nueve secciones obligatorias, en orden', () => {
     const report = buildEvidenceReport(baseInput())
     let previous = -1
     SECTION_TITLES.forEach((title, index) => {
@@ -80,7 +102,9 @@ describe('buildEvidenceReport', () => {
       expect(position).toBeGreaterThan(previous)
       previous = position
     })
-    expect(SECTION_TITLES.length).toBe(8)
+    expect(SECTION_TITLES.length).toBe(9)
+    // La sección del canal de redacción va justo detrás de la superficie local.
+    expect(SECTION_TITLES[5]).toBe('Canal de redacción')
   })
 
   it('lleva las dos frases literales, tal cual', () => {
@@ -199,6 +223,68 @@ describe('buildEvidenceReport', () => {
     expect(report).toContain('no puede aislar los secretos del agente')
     expect(report).toContain('completo y sin redacción')
   })
+
+  it('declara el canal de redacción: montado, dónde vive el mapa y qué queda en claro', () => {
+    const report = buildEvidenceReport(baseInput())
+    expect(report).toContain('## 6. Canal de redacción')
+    expect(report).toContain('Fila `privacy-helmcode` (plugin `@deepseek-ai/dsh-privacy-helmcode`)')
+    expect(report).toContain('Canal montado: **sí**')
+    expect(report).toContain('barrido del fixture')
+    // El fixture no declara `mapPath`: rige el valor por defecto bajo el home
+    // resuelto por la CLI, impreso como dato de la máquina generadora.
+    expect(report).toContain('**no declara `mapPath`**')
+    expect(report).toContain(join(RESOLVED_HOME, 'privacy', 'map.v1'))
+    expect(report).toContain(RESOLVED_HOME)
+    expect(report).toContain('no declara `mapKeyRef`')
+    expect(report).toContain('`PRIVACY_MAP_KEY`')
+    expect(report).toContain('`ttlDays: 30` días')
+    expect(report).toContain('`anonymize`')
+    expect(report).toContain('`workspace_read_anonymized`')
+    // El compromiso del diseño, con nombre y apellidos.
+    expect(report).toContain('LOG LOCAL DE LA SESIÓN guarda el original')
+    expect(report).toContain('CAPACIDAD ES EXPLÍCITA')
+    expect(report).toContain('Restauración: manual')
+    expect(report).toContain('FALLAN y no devuelven el texto sin redactar')
+  })
+
+  it('imprime el `mapPath` y la referencia de clave declarados en la fila', () => {
+    const dump = cloneDump()
+    const config = rowConfig(dump, 'privacy-helmcode')
+    config['mapPath'] = join('srv', 'privacy', 'map.v1')
+    config['mapKeyRef'] = 'CLAVE_DEL_PERFIL'
+    const report = buildEvidenceReport(baseInput(dump))
+
+    expect(report).toContain(`Mapa sellado: \`${join('srv', 'privacy', 'map.v1')}\` (declarado en la fila)`)
+    expect(report).toContain('`CLAVE_DEL_PERFIL` (declarada en la fila)')
+    expect(report).not.toContain('**no declara `mapPath`**')
+  })
+
+  it('declara los valores por defecto cuando la fila no trae configuración legible', () => {
+    const dump = cloneDump()
+    // Una fila sin `config` es una fila que no declara nada: el informe imprime
+    // los valores por defecto del plugin, no una suposición.
+    delete dumpRows(dump).find(row => row.id === 'privacy-helmcode')!.value['config']
+    const report = buildEvidenceReport(baseInput(dump))
+
+    expect(report).toContain('**no declara `mapPath`**')
+    expect(report).toContain('**no declara `mapKeyRef`**')
+    expect(report).toContain('Caducidad de las entradas nuevas: no declarada — las entradas no caducan')
+    expect(report).toContain('Canal montado: **sí**')
+  })
+
+  it('no declara montado el canal cuando su fila está deshabilitada o ausente', () => {
+    const dump = cloneDump()
+    dumpRows(dump).find(row => row.id === 'privacy-helmcode')!.value['disabled'] = true
+    const disabled = buildEvidenceReport(baseInput(dump))
+    expect(disabled).toContain('Canal montado: **no**')
+    expect(disabled).toContain('las dos herramientas no se publican')
+
+    const absent = buildEvidenceReport(baseInput(dumpWithoutRedaction()))
+    expect(absent).toContain('NO aparece en el volcado compuesto')
+    expect(absent).toContain('sale hacia el modelo tal cual')
+    expect(absent).toContain('Se dice aquí, en vez de callarse')
+    expect(absent).not.toContain('Canal montado: **sí**')
+  })
 })
 
 describe('decodeDumpBytes', () => {
@@ -235,7 +321,7 @@ describe('parseConfigDump', () => {
     const ids = rows.map(row => row.id)
     expect(ids).toContain('tool-subagent-codex')
     expect(ids).toContain('preset-standard')
-    expect(ids.length).toBe(18)
+    expect(ids.length).toBe(19)
     const nested = rows.find(row => row.id === 'tool-subagent-codex')
     expect(nested?.path).toEqual(['preset-standard', 'tool-subagent-codex'])
     expect(rows.find(row => row.id === 'web')?.path).toEqual(['web'])
@@ -310,6 +396,48 @@ describe('telemetryEvidence', () => {
       { id: 'session-telemetry-otel', name: '@deepseek-ai/dsh-session-telemetry-otel', disabled: true },
     ]
     expect(telemetryEvidence(dumpRows(disabled), 't2').mounted).toBe(false)
+  })
+})
+
+describe('renderValue', () => {
+  it('nombra un valor sin forma JSON en vez de imprimir `[object Object]`', () => {
+    // Un valor del volcado puede ser cualquier nodo YAML; lo que no tiene forma
+    // JSON (una función, un símbolo) se imprime tal cual, no como un objeto vacío.
+    expect(renderValue({ a: [1] })).toBe('{"a":[1]}')
+    expect(renderValue(function conNombre() {})).toContain('conNombre')
+    expect(renderValue(Symbol('marca'))).toBe('Symbol(marca)')
+    expect(renderValue(undefined)).toBe('(sin declarar)')
+  })
+})
+
+describe('redactionEvidence', () => {
+  it('ve la fila del fixture y resuelve la ruta por defecto bajo el home que se le pasa', () => {
+    const evidence = redactionEvidence(dumpRows(DUMP), RESOLVED_HOME)
+    expect(evidence.mounted).toBe(true)
+    expect(evidence.rows).toEqual(['privacy-helmcode'])
+    expect(evidence.resolvedHome).toBe(RESOLVED_HOME)
+    expect(evidence.defaultMapPath).toBe(join(RESOLVED_HOME, 'privacy', 'map.v1'))
+    expect(evidence.method).toContain('privacy-helmcode')
+    expect(evidence.method).toContain('1 fila(s), 1 sin `disabled: true`')
+  })
+
+  it('no montada sin fila, y no montada si la única fila está deshabilitada', () => {
+    const without = (DUMP as readonly unknown[])
+      .filter(entry => (entry as DumpRecord)['id'] !== 'privacy-helmcode')
+    expect(redactionEvidence(dumpRows(without), RESOLVED_HOME).mounted).toBe(false)
+    expect(redactionEvidence(dumpRows(without), RESOLVED_HOME).rows).toEqual([])
+
+    const disabled = [
+      ...without,
+      { id: 'privacy-helmcode', name: '@deepseek-ai/dsh-privacy-helmcode', disabled: true },
+    ]
+    const evidence = redactionEvidence(dumpRows(disabled), RESOLVED_HOME)
+    expect(evidence.mounted).toBe(false)
+    expect(evidence.method).toContain('1 fila(s), 0 sin `disabled: true`')
+  })
+
+  it('sin home explícito resuelve el de esta máquina y coloca el mapa bajo `privacy/map.v1`', () => {
+    expect(redactionEvidence(dumpRows(DUMP)).defaultMapPath.endsWith(join('privacy', 'map.v1'))).toBe(true)
   })
 })
 
