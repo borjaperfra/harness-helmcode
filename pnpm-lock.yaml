@@ -268,6 +268,9 @@ importers:
       '@deepseek-ai/dsh-headless':
         specifier: workspace:*
         version: link:../../packages/bundle/headless
+      '@deepseek-ai/dsh-helmcode':
+        specifier: workspace:*
+        version: link:../../packages/bundle/helmcode
       '@deepseek-ai/dsh-hmr':
         specifier: workspace:*
         version: link:../../packages/boot/hmr
@@ -2184,6 +2187,19 @@ importers:
         specifier: workspace:*
         version: link:../../session-query/session-query
 
+  packages/bundle/helmcode:
+    dependencies:
+      '@deepseek-ai/dsh-client-ui-brand-helmcode':
+        specifier: workspace:*
+        version: link:../../client/ui-brand-helmcode
+      '@deepseek-ai/dsh-llm-pi-ai':
+        specifier: workspace:*
+        version: link:../../llm/llm-pi-ai
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+
   packages/bundle/sdk-app:
     dependencies:
       '@deepseek-ai/dsh-cmdline':
@@ -2362,9 +2378,6 @@ importers:
       '@deepseek-ai/dsh-client-ui-attachment':
         specifier: workspace:*
         version: link:../../client/ui-attachment
-      '@deepseek-ai/dsh-client-ui-brand-helmcode':
-        specifier: workspace:*
-        version: link:../../client/ui-brand-helmcode
       '@deepseek-ai/dsh-client-ui-brand-official':
         specifier: workspace:*
         version: link:../../client/ui-brand-official
