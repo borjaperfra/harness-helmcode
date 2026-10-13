@@ -1,0 +1,97 @@
+/*
+ * Helmcode brand sheet.
+ *
+ * Typography: Roboto for titles and body, Roboto Mono for anything technical.
+ * Only weights 300, 400 and 500 exist — the brand forbids 700 and above. The
+ * faces are served from the shell's own /fonts directory, so the client stays
+ * offline-capable and no request leaves the deployment.
+ *
+ * Geometry: straight corners and hairline separators. The zeroed radius scale
+ * lives in the token layer; this sheet only reinforces separators, because
+ * border widths are component-owned in the shipped stylesheets.
+ */
+
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('/fonts/roboto-latin-300-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/roboto-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/roboto-latin-500-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Roboto Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/roboto-mono-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Roboto Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/roboto-mono-latin-500-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Weights above 500 do not exist in this brand: a 700 request would synthesize
+ * a faux-bold face, which the kit forbids. */
+body {
+  font-synthesis-weight: none;
+}
+
+/* Hairline separators. Only the ink is enforced here; widths stay with the
+ * component that owns the surface. */
+body hr,
+body [role='separator'] {
+  border-color: var(--dsw-alias-border-l2);
+}
+
+/* Brand seat: the expanded row shows the negative lockup, which the kit only
+ * provides for dark surfaces. On the derived light palette the mark degrades to
+ * the bare symbol rather than shipping a wordmark the brand never defined. */
+.hc-brand-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hc-brand-mark__symbol {
+  display: inline-flex;
+  align-items: center;
+}
+
+.hc-brand-mark__lockup {
+  display: none;
+  align-items: center;
+}
+
+body[data-ds-dark-theme] .hc-brand-mark__symbol {
+  display: none;
+}
+
+body[data-ds-dark-theme] .hc-brand-mark__lockup {
+  display: inline-flex;
+}
