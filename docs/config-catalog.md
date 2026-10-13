@@ -1213,6 +1213,85 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-goal -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-guard-eu-routing -->
+<a id="deepseek-aidsh-guard-eu-routing"></a>
+
+## `@deepseek-ai/dsh-guard-eu-routing`
+
+- `inject`: `llm` · `tools`
+- `source`: [`packages/guard/eu-routing/src/index.ts:39`](../packages/guard/eu-routing/src/index.ts)
+
+```ts config-catalog
+/** La configuracion del plugin, tal como la declara el perfil. */
+export interface Config {
+  /**
+   * Modo de la guardia. Por defecto `'open'`: el modo es una decision del perfil
+   * del cliente —es su despliegue, y su tratamiento del dato—, no de la maquina
+   * de desarrollo, que no es un despliegue regulado; y un `eu-only` por defecto
+   * romperia rutas legitimas que no estan en la tabla de residencia. Ver
+   * {@link ResidencyMode}.
+   */
+  mode?: ResidencyMode
+  /** Entradas de residencia que se SUMAN a las de por defecto (misma clave: gana la del perfil). */
+  residency?: ResidencyTable
+  /**
+   * Reglas de egreso que se SUMAN a las de por defecto. `tools` se declara
+   * mutable porque es la ENTRADA de configuracion, que es como la valida
+   * Schemastery; al leerla satisface {@link EgressToolTable}.
+   */
+  egressTools?: {
+    /**
+     * Nombres de herramienta que abren su propio trafico y que la guardia debe
+     * vetar cuando el modo no autoriza el egreso. Se SUMAN a
+     * {@link DEFAULT_EGRESS_TOOLS}, que es la lista blanca cerrada del paquete:
+     * declarar un nombre aqui amplia lo conocido, y nunca retira una entrada por
+     * defecto. Un nombre con el prefijo `mcp__` cubre las herramientas de ese
+     * servidor MCP (ver {@link decideTool}).
+     */
+    tools: string[]
+  }
+}
+
+/**
+ * El modo de la guardia, tal como lo declara el perfil.
+ *
+ * - `eu-only`: solo residencia `'eu'`. Es el modo del cliente regulado y el unico
+ *   que promete algo por si mismo. Default-deny.
+ * - `ask`: deja pasar la residencia `'eu'` y veta `'us'` y `'unknown'`. El harness
+ *   no puede preguntar por llamada de modelo —el seam de aprobacion es por
+ *   herramienta y fail-closed—, asi que veta y explica que `open` es la via para
+ *   autorizar. Ver el docblock del modulo.
+ * - `open`: uso interno y benchmarks. Permite siempre, tambien `'us'`.
+ *
+ * El modo por defecto del plugin es `open` y no `eu-only`: el modo es una
+ * decision del perfil del cliente (es su despliegue, y su tratamiento del dato),
+ * no de la maquina de desarrollo, que no es un despliegue regulado; y un
+ * `eu-only` por defecto romperia rutas legitimas que no estan en la tabla de
+ * residencia, empezando por las del propio perfil del usuario.
+ */
+export type ResidencyMode = 'eu-only' | 'ask' | 'open'
+
+/**
+ * Residencia por ruta de modelo, con clave `provider + '/' + model`.
+ *
+ * La ausencia de clave es `'unknown'`: no hace falta enumerar los proveedores
+ * ajenos para que queden vetados en `eu-only`, porque la lista es la blanca y no
+ * la negra.
+ */
+export interface ResidencyTable {
+  [providerModel: string]: Residency
+}
+
+/**
+ * Donde corre de verdad la inferencia.
+ *
+ * `'unknown'` no es `'eu'` ni un valor neutro: en `eu-only` es un veto. La
+ * ausencia de entrada en la tabla se lee como `'unknown'`, nunca como permiso.
+ */
+export type Residency = 'eu' | 'us' | 'unknown'
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-guard-eu-routing -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-headless -->
 <a id="deepseek-aidsh-headless"></a>
 
@@ -1744,7 +1823,7 @@ export type PiAiThinkingTokenBudgetField = NonNullable<OpenAICompletionsCompat['
 
 - `inject`: `llm`
 - `refs`: [`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · [`SystemPromptUpdate`](../packages/llm/llm/src/index.ts) · [`ToolUpdate`](../packages/llm/llm/src/index.ts)
-- `source`: [`packages/test-support/llm-replay/src/index.ts:1100`](../packages/test-support/llm-replay/src/index.ts)
+- `source`: [`packages/test-support/llm-replay/src/index.ts:1101`](../packages/test-support/llm-replay/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: the {@link ReplayConfig} inputs, each defaulting to its `DSH_SNAPSHOT_*` env var in `apply`. */
@@ -2164,6 +2243,37 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-plugin-manager -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-privacy-helmcode -->
+<a id="deepseek-aidsh-privacy-helmcode"></a>
+
+## `@deepseek-ai/dsh-privacy-helmcode`
+
+- `inject`: `tools` · `credentials`
+- `source`: [`packages/guard/privacy-helmcode/src/index.ts:92`](../packages/guard/privacy-helmcode/src/index.ts)
+
+```ts config-catalog
+/** La configuracion del plugin, tal como la declara el perfil. */
+export interface Config {
+  /**
+   * Ruta del fichero sellado. Ausente: `<DSH_HOME>/privacy/map.v1`, resuelto con
+   * `resolveDshHome` en el momento de montar el plugin.
+   */
+  mapPath?: string
+  /**
+   * Referencia de credencial que guarda la clave del mapa. Ausente:
+   * `PRIVACY_MAP_KEY`. La clave no se declara aqui: vive en el credential store.
+   */
+  mapKeyRef?: string
+  /**
+   * Caducidad, en dias, de las entradas NUEVAS del mapa. Ausente: las entradas
+   * no caducan. Una entrada caducada no se restaura (el mapa lo niega), pero su
+   * marcador sigue en el historial.
+   */
+  ttlDays?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-privacy-helmcode -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-ptc-runtime-node -->
 <a id="deepseek-aidsh-ptc-runtime-node"></a>
@@ -4156,6 +4266,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-client-ui-agent-preset` | — | [`packages/client/ui-agent-preset/src/index.ts`](../packages/client/ui-agent-preset/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-approval` | — | [`packages/client/ui-approval/src/index.ts`](../packages/client/ui-approval/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-attachment` | — | [`packages/client/ui-attachment/src/index.ts`](../packages/client/ui-attachment/src/index.ts) |
+| `@deepseek-ai/dsh-client-ui-brand-helmcode` | — | [`packages/client/ui-brand-helmcode/src/index.ts`](../packages/client/ui-brand-helmcode/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-brand-official` | — | [`packages/client/ui-brand-official/src/index.ts`](../packages/client/ui-brand-official/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-chat` | — | [`packages/client/ui-chat/src/index.ts`](../packages/client/ui-chat/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-commands` | — | [`packages/client/ui-commands/src/index.ts`](../packages/client/ui-commands/src/index.ts) |
@@ -4284,6 +4395,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 | `@deepseek-ai/dsh-client-ui-slots` | — | [`packages/client/ui-slots/src/index.ts`](../packages/client/ui-slots/src/index.ts) |
 | `@deepseek-ai/dsh-client-web` | — | [`packages/client/web/src/index.ts`](../packages/client/web/src/index.ts) |
 | `@deepseek-ai/dsh-cmdline` | — | [`packages/boot/cmdline/src/index.ts`](../packages/boot/cmdline/src/index.ts) |
+| `@deepseek-ai/dsh-compliance-evidence` | — | [`packages/host/compliance-evidence/src/index.ts`](../packages/host/compliance-evidence/src/index.ts) |
 | `@deepseek-ai/dsh-deque` | — | [`packages/util/deque/src/index.ts`](../packages/util/deque/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-agent-team-profile` | — | [`packages/experimental/agent-team-profile/src/index.ts`](../packages/experimental/agent-team-profile/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-browser-use-runtime` | — | [`packages/experimental/browser-use-runtime/src/index.ts`](../packages/experimental/browser-use-runtime/src/index.ts) |
@@ -4291,6 +4403,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 | `@deepseek-ai/dsh-experimental-voice-input-bundle` | — | [`packages/experimental/voice-input-bundle/src/index.ts`](../packages/experimental/voice-input-bundle/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-webworker-packer` | — | [`packages/experimental/webworker-packer/src/index.ts`](../packages/experimental/webworker-packer/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-webworker-runtime` | — | [`packages/experimental/webworker-runtime/src/index.ts`](../packages/experimental/webworker-runtime/src/index.ts) |
+| `@deepseek-ai/dsh-helmcode` | — | [`packages/bundle/helmcode/src/index.ts`](../packages/bundle/helmcode/src/index.ts) |
 | `@deepseek-ai/dsh-home-paths` | — | [`packages/util/home-paths/src/index.ts`](../packages/util/home-paths/src/index.ts) |
 | `@deepseek-ai/dsh-hook-protocol` | — | [`packages/hooks/hook-protocol/src/index.ts`](../packages/hooks/hook-protocol/src/index.ts) |
 | `@deepseek-ai/dsh-http-proxy` | — | [`packages/util/http-proxy/src/index.ts`](../packages/util/http-proxy/src/index.ts) |
@@ -4301,6 +4414,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 | `@deepseek-ai/dsh-native-command` | — | [`packages/util/native-command/src/index.ts`](../packages/util/native-command/src/index.ts) |
 | `@deepseek-ai/dsh-output-retention` | — | [`packages/util/output-retention/src/index.ts`](../packages/util/output-retention/src/index.ts) |
 | `@deepseek-ai/dsh-package-manifest` | — | [`packages/util/package-manifest/src/index.ts`](../packages/util/package-manifest/src/index.ts) |
+| `@deepseek-ai/dsh-quota-helmcode` | — | [`packages/llm/quota-helmcode/src/index.ts`](../packages/llm/quota-helmcode/src/index.ts) |
 | `@deepseek-ai/dsh-remote-mock` | — | [`packages/test-support/remote-mock/src/index.ts`](../packages/test-support/remote-mock/src/index.ts) |
 | `@deepseek-ai/dsh-sandbox-windows-acl` | — | [`packages/sandbox/sandbox-windows-acl/src/index.ts`](../packages/sandbox/sandbox-windows-acl/src/index.ts) |
 | `@deepseek-ai/dsh-scope` | — | [`packages/core/scope/src/index.ts`](../packages/core/scope/src/index.ts) |

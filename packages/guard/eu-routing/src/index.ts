@@ -52,7 +52,17 @@ export interface Config {
    * mutable porque es la ENTRADA de configuracion, que es como la valida
    * Schemastery; al leerla satisface {@link EgressToolTable}.
    */
-  egressTools?: { tools: string[] }
+  egressTools?: {
+    /**
+     * Nombres de herramienta que abren su propio trafico y que la guardia debe
+     * vetar cuando el modo no autoriza el egreso. Se SUMAN a
+     * {@link DEFAULT_EGRESS_TOOLS}, que es la lista blanca cerrada del paquete:
+     * declarar un nombre aqui amplia lo conocido, y nunca retira una entrada por
+     * defecto. Un nombre con el prefijo `mcp__` cubre las herramientas de ese
+     * servidor MCP (ver {@link decideTool}).
+     */
+    tools: string[]
+  }
 }
 
 /**
