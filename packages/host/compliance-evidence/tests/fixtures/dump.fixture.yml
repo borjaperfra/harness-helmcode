@@ -1,0 +1,136 @@
+# Fixture SINTÉTICO del informe de evidencia.
+#
+# No es un volcado de Helmcode: es un volcado pequeño escrito a mano con la MISMA
+# FORMA que produce `dsh --profile <nombre> --dump-config` (`apps/cli/src/dump-config.ts`,
+# con `renderConfigDump` en `packages/boot/app-boot/src/index.ts:429`): una
+# secuencia de filas con `id`, `name`, `config` y, a veces, `disabled`, con las
+# capas marcadas por comentarios `# ==` y expresiones `!!js` que el generador
+# conserva sin evaluar.
+#
+# Procedencia de los valores que no son relleno:
+# - El proveedor `helmcode` (`displayName`, `api`, `baseURL`, `apiKeyEnv`) y sus
+#   modelos `deepseek-v4-flash`, `glm5.3-flash`, `qwen3.6` y `gemma4` están
+#   tomados de `packages/bundle/helmcode/cordis.patch.yml:35-97`.
+# - `helmcode/claude-opus-5-5` sale de la tabla por defecto de la guardia
+#   (`guard-eu-routing/src/defaults.ts:61`, que lo marca `us`), no del bundle.
+# - El proveedor `nan-builders` y los modelos `deepseek-v4-flash` y `glm5.3` de
+#   su roster salen de un volcado real de esta máquina (`dump-config.txt:72-113`).
+# - `session-persistence-jsonl`, `fs-checkpoints`, `spill-local`, `credentials`,
+#   `session-log-download`, `web`, `web-fetch-http`, `web-search-duckduckgo`,
+#   `tool-web`, `settings` y el preset `standard` con sus dos subagentes externos
+#   son filas reales del mismo volcado.
+#
+# Relleno declarado como relleno (no es un dato de Helmcode):
+# - Los dos servidores MCP: `mcp.example.invalid` es un dominio reservado y
+#   `mcp-files-server` es un ejecutable inventado para el fixture.
+# - La fila `guard-eu-routing`: el paquete se está aterrizando en paralelo y su
+#   forma aquí es la del contrato del brief (`config.mode`).
+#
+# La tabla de residencia que usan los tests omite A PROPÓSITO
+# `helmcode/glm5.3-flash` para ejercitar el camino `unknown`: esa ausencia es del
+# test, no un dato de Helmcode.
+#
+# == @deepseek-ai/dsh-base
+- id: credentials
+  name: '@deepseek-ai/dsh-credentials-local'
+- id: llm-pi-ai
+  name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      nan-builders:
+        displayName: NaN Builders
+        api: openai-completions
+        baseURL: https://api.nan.builders/v1
+        apiKeyEnv: NAN_BUILDERS_API_KEY
+        models:
+          - id: deepseek-v4-flash
+            name: DeepSeek V4.1 Flash
+          - id: glm5.3
+            name: GLM 5.3
+# == @deepseek-ai/dsh-base, patched by <perfil>
+- id: llm-pi-ai-helmcode
+  name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      helmcode:
+        displayName: Helmcode
+        api: openai-completions
+        baseURL: https://api.helmcode.com/v1
+        apiKeyEnv: HELMCODE_API_KEY
+        models:
+          - id: deepseek-v4-flash
+            name: DeepSeek V4.1 Flash
+          - id: glm5.3-flash
+            name: GLM 5.3 Flash
+          - id: qwen3.6
+            name: Qwen 3.6
+          - id: gemma4
+            name: Gemma 4
+          - id: claude-opus-5-5
+            name: Claude Opus 5.5
+# == fixture: la guardia de residencia, en el modo que el test elija
+- id: guard-eu-routing
+  name: '@deepseek-ai/dsh-guard-eu-routing'
+  config:
+    mode: eu-only
+# == @deepseek-ai/dsh-base
+- id: session-persistence-jsonl
+  name: '@deepseek-ai/dsh-session-persistence-jsonl'
+  config:
+    root: !!js dshHomePath('sessions')
+- id: fs-checkpoints
+  name: '@deepseek-ai/dsh-fs-checkpoints'
+- id: spill-local
+  name: '@deepseek-ai/dsh-spill-local'
+- id: session-log-download
+  name: '@deepseek-ai/dsh-session-log-export'
+- id: web
+  name: '@deepseek-ai/dsh-web'
+  config:
+    fetchProvider: http
+- id: web-fetch-http
+  name: '@deepseek-ai/dsh-web-fetch-http'
+- id: web-search-duckduckgo
+  name: '@deepseek-ai/dsh-web-search-duckduckgo'
+- id: tool-web
+  name: '@deepseek-ai/dsh-tool-web'
+  config:
+    fetch: true
+    searchTimeoutMs: 60000
+# == fixture: dos servidores MCP, uno por HTTP y otro por stdio
+- id: mcp-github
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    transport: streamable-http
+    serverName: github
+    url: https://mcp.example.invalid/mcp
+- id: mcp-files
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    transport: stdio
+    serverName: files
+    command: mcp-files-server
+    args:
+      - --root
+      - .
+# == @deepseek-ai/dsh-base, patched by <perfil>
+- id: settings
+  name: '@deepseek-ai/dsh-settings'
+  disabled: !!js '!ctx.get(''profileContext'')'
+- id: preset-standard
+  name: '@deepseek-ai/dsh-agent-preset'
+  config:
+    id: standard
+    order: 1
+    plugins:
+      - id: tool-subagent-codex
+        name: '@deepseek-ai/dsh-tool-subagent'
+        config:
+          provider: codex
+          toolName: subagent_codex
+      - id: tool-subagent-claude-code
+        name: '@deepseek-ai/dsh-tool-subagent'
+        disabled: true
+        config:
+          provider: claude-code
+          toolName: subagent_claude_code
