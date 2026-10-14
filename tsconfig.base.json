@@ -324,6 +324,11 @@
       "@deepseek-ai/dsh-session-format-catalog/message-projections": ["./packages/session/session-format-catalog/src/message-projections.ts"],
       "@deepseek-ai/dsh-native-command/types": ["./packages/util/native-command/src/types.ts"],
       "@deepseek-ai/dsh-github-connector": ["./packages/connectors/github/src"],
+      // El paquete se llama dsh-retrieval-helmcode pero vive en
+      // packages/retrieval/helmcode, asi que el generador (que emite
+      // dsh-<ultimo-segmento-del-directorio>) no puede emitirlo: va a mano,
+      // fuera de la region generada, que es la unica forma de que sobreviva.
+      "@deepseek-ai/dsh-retrieval-helmcode": ["./packages/retrieval/helmcode/src"],
       // BEGIN generated package aliases — pnpm run gen-tsconfig-paths
       "@deepseek-ai/dsh-acp": ["./packages/acp/acp/src"],
       "@deepseek-ai/dsh-acp-app": ["./packages/bundle/acp-app/src"],

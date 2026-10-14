@@ -9901,6 +9901,8 @@ importers:
         specifier: workspace:*
         version: link:../../util/timeout
 
+  packages/retrieval/helmcode: {}
+
   packages/runtime-diagnostics/invariants:
     dependencies:
       '@deepseek-ai/schemastery':

@@ -1,0 +1,61 @@
+{
+  "name": "@deepseek-ai/dsh-retrieval-helmcode",
+  "description": "Nucleo puro de recuperacion para Helmcode: troceador consciente de parrafos, clientes de embeddings (qwen3-embedding) y rerank con fetch inyectable, e indice local que ordena candidatos por coseno en JS",
+  "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/686f6c61/harness-helmcode.git",
+    "directory": "packages/retrieval/helmcode"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./chunk": {
+      "types": "./lib/types/chunk.d.ts",
+      "default": "./lib/types/chunk.js"
+    },
+    "./embed": {
+      "types": "./lib/types/embed.d.ts",
+      "default": "./lib/types/embed.js"
+    },
+    "./errors": {
+      "types": "./lib/types/errors.d.ts",
+      "default": "./lib/types/errors.js"
+    },
+    "./http": {
+      "types": "./lib/types/http.d.ts",
+      "default": "./lib/types/http.js"
+    },
+    "./rerank": {
+      "types": "./lib/types/rerank.d.ts",
+      "default": "./lib/types/rerank.js"
+    },
+    "./search": {
+      "types": "./lib/types/search.d.ts",
+      "default": "./lib/types/search.js"
+    },
+    "./store": {
+      "types": "./lib/types/store.d.ts",
+      "default": "./lib/types/store.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/types/**/*.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "peerDependencies": {},
+  "dependencies": {},
+  "devDependencies": {}
+}
