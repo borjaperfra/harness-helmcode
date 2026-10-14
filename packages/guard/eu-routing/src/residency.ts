@@ -2,10 +2,11 @@
  * La cara de LECTURA de la residencia: la misma tabla que decide el veto,
  * expuesta a quien necesita saber DONDE corre una ruta sin decidir nada.
  *
- * El selector de modelos la usa para pintar la residencia declarada junto al
- * nombre del modelo, porque la decision de residencia se toma al ELEGIR modelo.
- * Este objeto **no veta, no autoriza y no tiene efectos**: el veredicto sigue en
- * el waterfall `llm/stream` ({@link decideModelRoute}) y en
+ * El selector de modelos la usa —a traves del catalogo, que el host sirve con la
+ * residencia de cada modelo— para pintar la residencia declarada junto al nombre
+ * del modelo, porque la decision de residencia se toma al ELEGIR modelo. Este
+ * objeto **no veta, no autoriza y no tiene efectos**: el veredicto sigue en el
+ * waterfall `llm/stream` ({@link decideModelRoute}) y en
  * `tools/pre-execute` ({@link decideTool}), que son los unicos seams por los que
  * pasa de verdad una llamada.
  *
@@ -36,10 +37,11 @@ export interface GuardEuRouting {
 /**
  * Construye la cara de lectura sobre una tabla de residencia concreta.
  *
- * Quien la publique decide QUE tabla lee: el host publica la efectiva (los
- * valores por defecto mas lo que sume la configuracion del perfil) y la mitad de
- * navegador publica la de por defecto, porque el Loader del navegador crea cada
- * entrada sin configuracion.
+ * Quien la publique decide QUE tabla lee; el plugin publica la EFECTIVA (los
+ * valores por defecto mas lo que sume la configuracion del perfil), que es la
+ * que decide el veto y la que el host pregunta al servir el catalogo de modelos.
+ * No hay cara de navegador: el Loader del navegador crea cada entrada sin
+ * configuracion, asi que una copia alli solo podria contradecir al host.
  *
  * @param table - la lista blanca de residencia por `provider/model`.
  * @returns el objeto que se publica como `ctx.guardEuRouting`.

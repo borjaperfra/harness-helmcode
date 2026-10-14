@@ -11,7 +11,6 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import { createScope } from '@deepseek-ai/dsh-api-session-controller/client'
-import { apply as applyResidencyGuard, inject as residencyGuardInject } from '@deepseek-ai/dsh-guard-eu-routing/client'
 import { en as helmcodeEn, es as helmcodeEs } from '@deepseek-ai/dsh-client-ui-brand-helmcode/src/client/locales.ts'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
@@ -67,7 +66,7 @@ const GROUPS = [{
 }]
 
 /** Boot the plugin over fake faces + a stateful fake host (current moves on selectModel). */
-async function bench(locale: 'es' | 'en' = 'es', guard = false) {
+async function bench(locale: 'es' | 'en' = 'es') {
   const ctx = new Context()
   let defaultSelection: ModelSelection = { provider: 'deepseek-official', model: 'deepseek-v4-flash' }
   let selected = defaultSelection
@@ -160,9 +159,6 @@ async function bench(locale: 'es' | 'en' = 'es', guard = false) {
   })
   const track = vi.fn()
   ctx.provide('productAnalytics', { enabled: true, track } as never)
-  // La guardia de residencia es OPCIONAL en esta composicion: montada, el
-  // asiento etiqueta cada ruta; sin ella no hay etiqueta (fail-soft).
-  if (guard) await ctx.plugin({ inject: residencyGuardInject, apply: applyResidencyGuard }).await()
   const fiber = ctx.plugin({ inject: [...inject], apply })
   await fiber.await()
   await ctx.plugin(function probe() {}).await()
@@ -559,54 +555,46 @@ it.each([false, true])('accepts switches with blank=%s and no refused switch', a
   } finally { await scope.fiber.dispose(); await b.ctx.fiber.dispose() }
 })
 
-describe('residencia declarada en el asiento de modelos', () => {
-  it('sin guardia montada no hay etiqueta: la cara contesta undefined (fail-soft)', async () => {
+describe('etiqueta de residencia del asiento de modelos', () => {
+  it('traduce la residencia del catalogo sin ninguna guardia del navegador montada', async () => {
     const b = await bench('es')
     b.mint('s1')
     const face = b.seat().inject!(sid('s1'))
 
-    expect(face.residency).toBeTypeOf('function')
-    expect(face.residency?.('helmcode', 'qwen3.6')).toBeUndefined()
-    expect(face.residency?.('deepseek-official', 'deepseek-v4-flash')).toBeUndefined()
-  })
-
-  it('con la guardia montada etiqueta eu, us y unknown en el vocabulario de la marca', async () => {
-    const b = await bench('es', true)
-    b.mint('s1')
-    const face = b.seat().inject!(sid('s1'))
-
-    // La tabla de la guardia declara la ruta europea y los nueve frontera.
-    expect(face.residency?.('helmcode', 'qwen3.6')).toEqual({ kind: 'eu', label: helmcodeEs['residency.eu'] })
-    expect(face.residency?.('helmcode', 'gemma4')).toEqual({ kind: 'eu', label: helmcodeEs['residency.eu'] })
-    expect(face.residency?.('helmcode', 'gpt-6-astra')).toEqual({ kind: 'us', label: helmcodeEs['residency.us'] })
-    // Las rutas ajenas a la tabla —el proveedor por defecto, la ruta NaN del
-    // usuario— salen 'unknown': default-deny, nunca un permiso implicito.
-    expect(face.residency?.('deepseek-official', 'deepseek-v4-flash'))
-      .toEqual({ kind: 'unknown', label: helmcodeEs['residency.unknown'] })
-    expect(face.residency?.('nan-builders', 'glm5.3'))
-      .toEqual({ kind: 'unknown', label: helmcodeEs['residency.unknown'] })
+    // El asiento ya no lee la guardia en el navegador: la residencia viaja en el
+    // modelo, resuelta por el host. Sin ese servicio montado, la cara sigue
+    // contestando el texto de la marca.
+    expect(b.ctx.get('guardEuRouting')).toBeUndefined()
+    expect(face.residencyLabel).toBeTypeOf('function')
+    expect(face.residencyLabel?.('eu')).toBe(helmcodeEs['residency.eu'])
+    expect(face.residencyLabel?.('us')).toBe(helmcodeEs['residency.us'])
+    expect(face.residencyLabel?.('unknown')).toBe(helmcodeEs['residency.unknown'])
+    await b.ctx.fiber.dispose()
   })
 
   it('la etiqueta sigue el idioma activo sin volver a montar el plugin', async () => {
-    const b = await bench('es', true)
+    const b = await bench('es')
     b.mint('s1')
     const face = b.seat().inject!(sid('s1'))
-    expect(face.residency?.('helmcode', 'qwen3.6')?.label).toBe(helmcodeEs['residency.eu'])
+    expect(face.residencyLabel?.('eu')).toBe(helmcodeEs['residency.eu'])
 
     b.ctx.locale.setLocale('en')
-    expect(face.residency?.('helmcode', 'qwen3.6')?.label).toBe(helmcodeEn['residency.eu'])
-    expect(face.residency?.('helmcode', 'gpt-6-astra')?.label).toBe(helmcodeEn['residency.us'])
+    expect(face.residencyLabel?.('eu')).toBe(helmcodeEn['residency.eu'])
+    expect(face.residencyLabel?.('us')).toBe(helmcodeEn['residency.us'])
+    await b.ctx.fiber.dispose()
   })
 
   it('la etiqueta no decide nada: el asiento sigue seleccionando la misma ruta', async () => {
-    const b = await bench('es', true)
+    const b = await bench('es')
     b.mint('s1')
     const face = b.seat().inject!(sid('s1'))
-    expect(face.residency?.('helmcode', 'gpt-6-astra')?.kind).toBe('us')
+    // Lo que el host declara para esa ruta es lo que la etiqueta traduce...
+    expect(face.residencyLabel?.('us')).toBe(helmcodeEs['residency.us'])
 
-    // La guardia etiqueta; vetar (o no) es cosa del host, no de esta superficie.
+    // ...y vetar (o no) es cosa del host, no de esta superficie.
     await expect(face.select({ provider: 'helmcode', model: 'gpt-6-astra' }))
       .resolves.toEqual({ ok: true, value: undefined })
     expect(b.hostCurrent()).toEqual({ provider: 'helmcode', model: 'gpt-6-astra' })
+    await b.ctx.fiber.dispose()
   })
 })

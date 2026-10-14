@@ -18,9 +18,6 @@
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../guard/eu-routing/tsconfig.client.json"
-    },
-    {
       "path": "../locale/tsconfig.client.json"
     },
     {

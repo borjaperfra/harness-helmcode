@@ -18,10 +18,6 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
-    "./client": {
-      "types": "./lib/types/client/index.d.ts",
-      "default": "./lib/client.js"
-    },
     "./decisions": {
       "types": "./lib/types/decisions.d.ts",
       "default": "./lib/types/decisions.js"
@@ -37,18 +33,8 @@
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
-  "dsh": {
-    "client": {
-      "platform": "web"
-    }
-  },
-  "scripts": {
-    "bundle": "tsdown",
-    "watch": "tsdown --watch"
-  },
   "files": [
     "lib/index.js",
-    "lib/client.js",
     "lib/types/**/*.js",
     "lib/types/**/*.d.ts"
   ],

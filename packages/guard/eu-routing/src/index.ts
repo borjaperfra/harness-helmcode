@@ -9,8 +9,8 @@
  * harness) y las tablas por defecto en `defaults.ts`; este fichero es el cableado
  * a los dos seams reales, y no decide nada por su cuenta: pregunta al nucleo y
  * obedece. Publica ademas la cara de LECTURA de la tabla
- * (`ctx.guardEuRouting`, ver `residency.ts`), que la interfaz usa para decir
- * donde corre cada ruta; esa cara no veta nada.
+ * (`ctx.guardEuRouting`, ver `residency.ts`), de la que el host sirve la
+ * residencia de cada modelo del catalogo; esa cara no veta nada.
  *
  * @module @deepseek-ai/dsh-guard-eu-routing
  */
@@ -122,9 +122,10 @@ export function apply(ctx: Context, config: Config = {}): void {
 
   // 0. La cara de LECTURA. Se publica sobre la tabla EFECTIVA —los valores por
   //    defecto mas lo que sume la configuracion del perfil—, que es la misma
-  //    que decide el veto de abajo: asi la etiqueta que pinta la interfaz y el
-  //    veredicto no pueden divergir. No decide nada; el veto sigue en los dos
-  //    waterfalls.
+  //    que decide el veto de abajo. El host la pregunta al servir el catalogo de
+  //    modelos y viaja con cada modelo hasta la interfaz, de modo que la
+  //    etiqueta que pinta el selector y el veredicto no pueden divergir. No
+  //    decide nada; el veto sigue en los dos waterfalls.
   ctx.provide('guardEuRouting', residencyReader(residency))
 
   // 1. Egreso por modelo: el waterfall `llm/stream` envuelve TODA llamada de

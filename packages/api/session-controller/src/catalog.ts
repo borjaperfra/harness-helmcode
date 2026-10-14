@@ -3,6 +3,11 @@
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-settings'
+// Type-only: pulls the residency guard's Context merge, which is what types
+// `ctx.get('guardEuRouting')` below. No runtime edge: the browser catalog is a
+// projection of the live Host registry, and the guard decides the veto in this
+// same Host context.
+import type {} from '@deepseek-ai/dsh-guard-eu-routing'
 import type { LlmModelInfo } from '@deepseek-ai/dsh-llm'
 import type { Context } from '@deepseek-ai/cordis'
 import type {
@@ -13,7 +18,13 @@ import type {
 
 /**
  * Build the browser model catalog without requiring a Session.
- * @param ctx - Host context carrying the live LLM registry.
+ *
+ * Each model carries the residency the mounted guard declares for its route, so
+ * the surface that renders a model reads the same declaration the veto decides
+ * with instead of a second, browser-side copy of the table.
+ *
+ * @param ctx - Host context carrying the live LLM registry and, optionally, the
+ * residency guard's read face.
  * @param defaultSelection - deployment default used before a Session selects a model.
  * @returns successful non-empty provider groups and isolated provider failures.
  */
@@ -22,6 +33,12 @@ export async function buildModelCatalog(
   defaultSelection: ModelSelection = ctx.agentDefaultModel.currentSelection(),
 ): Promise<ModelCatalog> {
   const providers = ctx.llm.listProviders()
+  // The read face answers from the guard's EFFECTIVE table —the defaults plus
+  // whatever the profile adds— and reads an undeclared route as 'unknown'.
+  // Without a mounted guard every route is 'unknown': nobody declared where it
+  // runs, which is exactly what the guard's `eu-only` veto denies. Asked once
+  // per catalog, never per row.
+  const guard = ctx.get('guardEuRouting')
   const catalog = await Promise.all(providers.map(async (provider) => {
     try {
       const models = await ctx.llm.listModels(provider.id)
@@ -44,6 +61,7 @@ export async function buildModelCatalog(
           name: model.name,
           ...(model.description === undefined ? {} : { description: model.description }),
           ...(reasoning === undefined ? {} : { reasoning }),
+          residency: guard === undefined ? 'unknown' : guard.residency(provider.id, model.id),
         }
       }))
       return {

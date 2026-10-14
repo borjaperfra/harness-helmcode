@@ -45,7 +45,7 @@ Both entries group models by provider, with DeepSeek Account first and DeepSeek 
 
 ### Residency
 
-When the EU routing guard is mounted, every model row in the composer menu carries the route's declared residency under the model name: a green dot for `eu`, amber for `us`, grey for `unknown`. The label is the guard's own reading (`ctx.guardEuRouting`), asked at paint time and absent when no guard is mounted — fail-soft, with no label rather than a guess. Its copy comes from the brand's `helmcode` namespace, so the vocabulary has one owner. The label is informational: it never blocks a selection, and the veto remains the guard's decision on the Host.
+Every model row whose catalog entry declares a residence carries it under the model name: a green dot for `eu`, amber for `us`, grey for `unknown`. The value travels with the model — the Host resolved it from the mounted EU routing guard's effective table when it served `session/modelCatalog` — so the badge reads the model it is already rendering and cannot disagree with the veto on the Host. A model whose entry carries no residence paints no label, and so does a composition without the brand's label face: fail-soft, no label rather than a guess. Its copy comes from the brand's `helmcode` namespace, so the vocabulary has one owner. The label is informational: it never blocks a selection, and the veto remains the guard's decision on the Host.
 
 The dot carries the color and the text sits in the caption tone, so the label spends no accent ink; the accent budget's few strong indigo moments belong to the surfaces that carry them, not to a list row.
 
@@ -73,7 +73,7 @@ The composer `ModelSelect` and `/model` option builder share [provider ordering]
 
 Two entries over ONE per-session directory owned by `ModelDirectoryResolver` (`ctx.modelDirectories`): the `/model` popupSelect contribution (registered through `ctx.commandUi`) and the composer's named `conversation.input.model` seat both load the session's available directory through `session.models` and submit through `session.selectModel` via the same `ModelDirectory` instance, so a switch made in either entry is what the other shows next. Directory loads and selections share a generation counter so an older response never overwrites a newer one. The directory publishes the latest submitted selection as `pending` until it settles or a connection reset invalidates it; a connection reset drops every resident projection and repulls the Host-restored selection before display. Directories are per-session, resolved lazily, and disposed with the session scope; addressed subagent sessions expose neither entry. Every resident directory refetches directly on forwarded `llm/adapters-updated`, `settings/document-updated`, and credential update events.
 
-The seat's inject face also carries the residency reader: it closes over the client scope, asks `ctx.get('guardEuRouting')` on every call — so a guard mounted after the seat was injected still counts — and translates through the brand's `helmcode` namespace. The type-only import of the guard's browser half brings its `Context` merge, which is what types the lookup; the guard package is a devDependency, so no runtime edge exists between the two bundles.
+The seat's inject face also carries the residency label: the component hands it the residence the model declares and it answers the brand's `helmcode` text, so the residency itself is never asked of a browser service — the Host already resolved it into the catalog, and the guard's browser half was retired with that change. Only the language is a browser concern, and switching locale relabels the same rows without remounting the plugin.
 
 </details>
 
@@ -109,7 +109,7 @@ These limits define the current model surface. They are current package constrai
 - **No create-time or addressed-subagent selection** — both entries require an existing ordinary session's Agent; there is no draft-phase model choice to fold into session creation, and subagent continuation deliberately exposes no independent model-selection contract.
 - **Directory names are presentation-only** — selection and persistence use provider/model/effort ids; a provider whose catalog or exact-model metadata lookup fails lists as an unselectable failure row until reload.
 - **No arbitrary effort input** — the composer offers only the exact model's adapter-advertised levels; an adapter without reasoning metadata leaves the Effort row absent.
-- **Residency labels are the guard's declaration, not a measurement** — without the guard mounted there is no label at all, the label never blocks a selection, and in the browser the guard reads its default table (the browser Loader carries no row configuration), so a residency entry a profile adds shows as `unknown` there while the Host still enforces it.
+- **Residency labels are a declaration, not a measurement** — the value is what the deployment (and the guard's defaults) says about a route, resolved by the Host when it served the catalog; a model whose entry declares nothing, or a catalog served without the field, shows no label, and the label never blocks a selection.
 
 <a id="dev-note"></a>
 ### Dev Note
@@ -121,4 +121,4 @@ None.
 
 </details>
 
-**Runtime invariant:** No companion is published. The plugin registers a single command contribution and one seat, and the HMR-safety spec proves that both registrations are disposed correctly. The plugin emits no Cordis events and owns no mutable state; its residency reader is a pure read of an optional service.
+**Runtime invariant:** No companion is published. The plugin registers a single command contribution and one seat, and the HMR-safety spec proves that both registrations are disposed correctly. The plugin emits no Cordis events and owns no mutable state; its residency label is a pure translation of a value the Host already resolved into the catalog.

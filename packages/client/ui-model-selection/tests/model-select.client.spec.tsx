@@ -918,41 +918,42 @@ it('restores the account model name after login without changing the saved route
   expect(directory.getSnapshot().current).toEqual(selected)
 })
 
-describe('ModelSelect residencia declarada', () => {
-  /** Las tres rutas del caso, una por residencia declarada. */
+describe('ModelSelect residencia declarada en el catalogo', () => {
+  /** Las tres residencias declaradas y un modelo que no declara ninguna. */
   const RESIDENCY_GROUPS: ModelDirectoryState['groups'] = [{
     id: 'helmcode',
     name: 'Helmcode',
     models: [
-      { id: 'model-eu', name: 'Modelo EU' },
-      { id: 'model-us', name: 'Modelo US' },
-      { id: 'model-x', name: 'Modelo X' },
+      { id: 'model-eu', name: 'Modelo EU', residency: 'eu' },
+      { id: 'model-us', name: 'Modelo US', residency: 'us' },
+      { id: 'model-x', name: 'Modelo X', residency: 'unknown' },
+      { id: 'model-sin', name: 'Modelo sin declarar' },
     ],
   }]
 
-  /** La cara que el asiento inyecta con la guardia montada: etiqueta las rutas de Helmcode. */
-  const residency = (provider: string, model: string) => {
-    if (provider !== 'helmcode') return undefined
-    const kind = model === 'model-eu' ? 'eu' as const : model === 'model-us' ? 'us' as const : 'unknown' as const
-    return { kind, label: { eu: 'Residencia UE', us: 'Residencia EE. UU.', unknown: 'Residencia desconocida' }[kind] }
-  }
+  /** La cara del asiento: solo traduce la residencia que el modelo ya trae. */
+  const residencyLabel = (kind: 'eu' | 'us' | 'unknown'): string =>
+    ({ eu: 'Residencia UE', us: 'Residencia EE. UU.', unknown: 'Residencia desconocida' })[kind]
 
   /** Abre el panel de modelos del catalogo dado (sin modelo actual, abre directo en la lista). */
-  function openModels(catalog: ModelDirectoryState['groups']): HTMLElement {
+  function openModels(catalog: ModelDirectoryState['groups'], label: boolean): HTMLElement {
     const directory = createSnapshotStore(state({ current: null, groups: catalog }))
     const view = render(<ModelSelect locked={false} available directory={directory}
-      load={vi.fn()} select={vi.fn()} residency={residency} t={t} />)
+      load={vi.fn()} select={vi.fn()} {...label ? { residencyLabel } : {}} t={t} />)
     fireEvent.click(screen.getByRole('button', { name: 'Seleccionar modelo' }))
     return view.container
   }
 
-  it('pinta punto de color y texto corto junto al nombre del modelo', () => {
-    openModels(RESIDENCY_GROUPS)
+  it('pinta punto de color y texto corto para la residencia que declara cada modelo', () => {
+    openModels(RESIDENCY_GROUPS, true)
 
+    // La residencia sale del MODELO que la fila ya esta pintando: 'unknown' no es
+    // un valor neutro, es lo que el veto eu-only deniega.
     expect(screen.getAllByRole('menuitemradio').map(row => row.textContent)).toEqual([
       'Modelo EUResidencia UE',
       'Modelo USResidencia EE. UU.',
       'Modelo XResidencia desconocida',
+      'Modelo sin declarar',
     ])
     // Verde eu, ambar us, gris unknown: el color ES el punto de estado, y el
     // texto va en el tono de caption para no gastar indigo de acento. El panel
@@ -963,28 +964,36 @@ describe('ModelSelect residencia declarada', () => {
       .toEqual(['done', 'warning', 'idle'])
   })
 
-  it('no pinta etiqueta cuando la cara no declara residencia (sin guardia, fail-soft)', () => {
-    const directory = createSnapshotStore(state({ current: null, groups: RESIDENCY_GROUPS }))
-    render(<ModelSelect locked={false} available directory={directory}
-      load={vi.fn()} select={vi.fn()} t={t} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Seleccionar modelo' }))
+  it('un modelo del catalogo SIN residencia no pinta etiqueta, aunque las demas la lleven', () => {
+    openModels(RESIDENCY_GROUPS, true)
 
-    expect(screen.getAllByRole('menuitemradio').map(row => row.textContent))
-      .toEqual(['Modelo EU', 'Modelo US', 'Modelo X'])
+    const rows = screen.getAllByRole('menuitemradio')
+    expect(rows[3]?.textContent).toBe('Modelo sin declarar')
+    expect(rows[3]?.querySelector('[data-residency]')).toBeNull()
+    expect(document.querySelectorAll('[data-residency]')).toHaveLength(3)
+  })
+
+  it('sin la cara de textos no hay etiqueta: la residencia no trae su propio idioma', () => {
+    openModels(RESIDENCY_GROUPS, false)
+
+    expect(screen.getAllByRole('menuitemradio').map(row => row.textContent)).toEqual([
+      'Modelo EU', 'Modelo US', 'Modelo X', 'Modelo sin declarar',
+    ])
     expect(document.querySelector('[data-residency]')).toBeNull()
   })
 
-  it('una ruta que la cara no declara se queda sin etiqueta, aunque las demas la lleven', () => {
+  it('una ruta sin residencia declarada se queda sin etiqueta, aunque el catalogo la liste', () => {
     openModels([
       ...RESIDENCY_GROUPS,
       { id: 'ajeno', name: 'Ajeno', models: [{ id: 'model-eu', name: 'Modelo Ajeno' }] },
-    ])
+    ], true)
 
     const rows = screen.getAllByRole('menuitemradio')
     expect(rows.map(row => row.textContent)).toEqual([
       'Modelo EUResidencia UE',
       'Modelo USResidencia EE. UU.',
       'Modelo XResidencia desconocida',
+      'Modelo sin declarar',
       'Modelo Ajeno',
     ])
     expect(document.querySelectorAll('[data-residency]')).toHaveLength(3)

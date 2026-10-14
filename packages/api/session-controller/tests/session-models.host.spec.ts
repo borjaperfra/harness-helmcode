@@ -23,6 +23,7 @@ import { ApiSessionAgentController } from '../src/agent.ts'
 import { buildModelCatalog, hasProviderApiKey } from '../src/catalog.ts'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
+import * as residencyGuard from '@deepseek-ai/dsh-guard-eu-routing'
 import { createSessionTestController, createSessionTestRemote } from './test-remote.ts'
 
 function request<P>(payload: P): P {
@@ -423,12 +424,13 @@ describe('Web session model selection', () => {
       id: 'deepseek-official',
       name: 'DeepSeek',
       models: [
-        { id: 'deepseek-chat', name: 'DeepSeek Chat', reasoning: REASONING },
+        { id: 'deepseek-chat', name: 'DeepSeek Chat', reasoning: REASONING, residency: 'unknown' },
         {
           id: 'deepseek-reasoner',
           name: 'DeepSeek Reasoner',
           description: 'Reasoning model',
           reasoning: REASONING,
+          residency: 'unknown',
         },
       ],
     }])
@@ -467,7 +469,7 @@ describe('Web session model selection', () => {
 
     const catalog = await buildModelCatalog(ctx)
     expect(catalog.groups).toEqual(expect.arrayContaining([
-      { id: 'plain', name: 'Plain', models: [{ id: 'plain-model', name: 'Plain Model' }] },
+      { id: 'plain', name: 'Plain', models: [{ id: 'plain-model', name: 'Plain Model', residency: 'unknown' }] },
       {
         id: 'described-reasoning',
         name: 'Described Reasoning',
@@ -477,12 +479,50 @@ describe('Web session model selection', () => {
           reasoning: {
             efforts: [{ id: 'high', name: 'High', description: 'More thinking' }],
           },
+          residency: 'unknown',
         }],
       },
     ]))
     expect(catalog.failures).toContainEqual({
       id: 'string-failure', name: 'String Failure', message: 'string catalog failure',
     })
+    await ctx.fiber.dispose()
+  })
+
+  it('carries the residency the mounted guard declares, profile-added entry included', async () => {
+    const { ctx } = await harness()
+    ctx.llm.registerAdapter(['helmcode'], new CatalogAdapter('Helmcode', [
+      { provider: 'helmcode', id: 'qwen3.6', name: 'Qwen 3.6' },
+      { provider: 'helmcode', id: 'gpt-6-astra', name: 'GPT-6 Astra' },
+    ]))
+    ctx.llm.registerAdapter(['nan-builders'], new CatalogAdapter('NaN Builders', [
+      { provider: 'nan-builders', id: 'glm5.3', name: 'GLM 5.3' },
+    ]))
+    // La MISMA tabla efectiva que decide el veto —defaults mas lo que suma el
+    // perfil— es la que sirve el catalogo, asi que una entrada del perfil ya no
+    // se lee 'unknown' en la superficie que la pinta.
+    residencyGuard.apply(ctx, { mode: 'eu-only', residency: { 'nan-builders/glm5.3': 'eu' } })
+
+    const catalog = await buildModelCatalog(ctx, { provider: 'deepseek-official', model: 'deepseek-chat' })
+    const declared = new Map(catalog.groups.flatMap(group => group.models.map(model =>
+      [`${group.id}/${model.id}`, model.residency] as const)))
+
+    expect(declared.get('helmcode/qwen3.6')).toBe('eu')
+    expect(declared.get('helmcode/gpt-6-astra')).toBe('us')
+    expect(declared.get('nan-builders/glm5.3')).toBe('eu')
+    // Lo que ninguna de las dos tablas declara se lee 'unknown': default-deny.
+    expect(declared.get('deepseek-official/deepseek-chat')).toBe('unknown')
+    await ctx.fiber.dispose()
+  })
+
+  it('reads every route as unknown without a mounted guard, never as an implicit permission', async () => {
+    const { ctx } = await harness()
+
+    const catalog = await buildModelCatalog(ctx, { provider: 'deepseek-official', model: 'deepseek-chat' })
+    const declared = catalog.groups.flatMap(group => group.models.map(model => model.residency))
+
+    expect(declared.length).toBeGreaterThan(0)
+    expect(new Set(declared)).toEqual(new Set(['unknown']))
     await ctx.fiber.dispose()
   })
 

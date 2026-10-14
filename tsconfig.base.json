@@ -78,10 +78,6 @@
       "@deepseek-ai/dsh-invariants": ["./packages/runtime-diagnostics/invariants/src/index.ts"],
       "@deepseek-ai/dsh-tool-call-timeout-policy": ["./packages/guard/timeout-policy/src"],
       "@deepseek-ai/dsh-guard-eu-routing": ["./packages/guard/eu-routing/src"],
-      // The guard is a dual-face package outside packages/client, so the
-      // generated bare alias above only maps its node half; the browser half
-      // needs this explicit subpath alias for source-mode imports.
-      "@deepseek-ai/dsh-guard-eu-routing/client": ["./packages/guard/eu-routing/src/client"],
       "@deepseek-ai/dsh-spill-policy/notice": ["./packages/spill/spill-policy/src/notice.ts"],
       "@deepseek-ai/dsh-subprocess/control": ["./packages/subprocess/subprocess/src/control.ts"],
       "@deepseek-ai/dsh-typert-registry": ["./packages/typert/registry/src/index.ts"],

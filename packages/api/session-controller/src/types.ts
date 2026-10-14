@@ -138,6 +138,20 @@ export interface ModelCatalogModel {
   readonly name: string
   readonly description?: string
   readonly reasoning?: ModelReasoning
+  /**
+   * The route's DECLARED residency, resolved when the catalog is served: the
+   * mounted residency guard's reading of its effective table (the package
+   * defaults plus whatever the deployment's profile adds), or `'unknown'` when
+   * no guard is mounted — the honest reading of a table nobody declared, and
+   * the same value the guard's `eu-only` veto denies.
+   *
+   * It is a DECLARATION, never an attestation: it states where the deployment
+   * says a route runs, not where a request was measured to run. It travels with
+   * the model so the surface that renders a route reads the value the veto
+   * decides with, instead of a second table that can disagree with it. Absent
+   * only in a catalog served without the field at all.
+   */
+  readonly residency?: 'eu' | 'us' | 'unknown'
 }
 
 /** One provider and its successfully loaded model catalog. */

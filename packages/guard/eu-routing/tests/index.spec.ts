@@ -259,6 +259,25 @@ describe('apply(): modo por defecto y tablas del perfil', () => {
     expect(result.isError).toBe(false)
   })
 
+  it('la tabla del veto sigue siendo defaults + perfil: el corte del catalogo no la toca', async () => {
+    // Sin perfil, una ruta que nadie declara se veta: la tabla es la lista blanca.
+    const defaults = await services()
+    await defaults.plugin(guard, { mode: 'eu-only' })
+    const defaultReached = probe(defaults)
+    expect(() => defaults.llm.stream(request('nan-builders', 'glm5.3'))).toThrow(LlmError)
+    expect(defaultReached()).toBe(false)
+
+    // Con perfil, esa MISMA ruta pasa porque la entrada se SUMA a los defaults...
+    const profiled = await services()
+    await profiled.plugin(guard, { mode: 'eu-only', residency: { 'nan-builders/glm5.3': 'eu' } })
+    const profileReached = probe(profiled)
+    await drain(profiled.llm.stream(request('nan-builders', 'glm5.3')))
+    expect(profileReached()).toBe(true)
+
+    // ...y los defaults siguen vetando en la composicion con perfil.
+    expect(() => profiled.llm.stream(request('helmcode', 'gpt-6-astra'))).toThrow(LlmError)
+  })
+
   it('las dos tablas del perfil se SUMAN a las de por defecto', async () => {
     const ctx = await services()
     guard.apply(ctx, {

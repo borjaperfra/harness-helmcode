@@ -139,11 +139,11 @@ function allow(): EgressDecision {
  * La residencia DECLARADA de una ruta, con la lectura default-deny de la tabla.
  *
  * Es la unica consulta a la tabla, compartida por la decision
- * ({@link decideModelRoute}) y por la cara de lectura que consume la interfaz
- * (`ctx.guardEuRouting`), de modo que la etiqueta que ve un humano y el veto no
- * puedan divergir. Un valor fuera de la tabla —o un valor que la tabla declare
- * pero no sea `'eu'` ni `'us'`, cosa que un fichero de perfil puede escribir—
- * se lee `'unknown'`, nunca como permiso.
+ * ({@link decideModelRoute}) y por la cara de lectura de la que el host sirve la
+ * residencia del catalogo de modelos (`ctx.guardEuRouting`), de modo que la
+ * etiqueta que ve un humano y el veto no puedan divergir. Un valor fuera de la
+ * tabla —o un valor que la tabla declare pero no sea `'eu'` ni `'us'`, cosa que
+ * un fichero de perfil puede escribir— se lee `'unknown'`, nunca como permiso.
  *
  * @param table - lista blanca de residencia por `provider/model`.
  * @param provider - Proveedor de la ruta, tal como lo registra el harness.

@@ -23,10 +23,13 @@
  * Retry remains the catalog-load surface. While the directory's pending
  * selection is unsettled, the trigger shows a spinner in place of its
  * chevron, and each row whose value that selection carries shows one in place
- * of its check mark. When the residency guard is mounted, every model row also
- * carries the route's declared residency next to the model name — the decision
- * happens at model choice, so the signal belongs here — and without a mounted
- * guard there is no label at all (fail-soft).
+ * of its check mark. Every model row that the catalog declares a residency for
+ * also carries that residency next to the model name — the decision happens at
+ * model choice, so the signal belongs here — read from the model the row is
+ * already rendering, and never from a second table of its own: the Host
+ * resolved it from the guard's effective table when it served the catalog. A
+ * model that carries no residency, or a composition without the brand's label
+ * face, paints no label at all (fail-soft).
  *
  * Presupuesto de acento (brandbook): la etiqueta de residencia es texto tecnico
  * pequeño y NO gasta indigo. El color lo lleva el punto de estado de la fila
@@ -48,7 +51,7 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { ModelSelectInjected } from './slots.ts'
+import type { ModelSelectInjected, ResidencyKind } from './slots.ts'
 import css from './ModelSelect.module.css'
 import { orderModelProviders } from './provider-order.ts'
 
@@ -60,7 +63,7 @@ type Pane = 'root' | 'model' | 'effort'
  * `unknown`. El color ES el punto (el texto va en el tono de caption), que es
  * como esta etiqueta respeta el presupuesto de acento del brandbook.
  */
-const RESIDENCY_DOT: Record<'eu' | 'us' | 'unknown', StateDotState> = {
+const RESIDENCY_DOT: Record<ResidencyKind, StateDotState> = {
   eu: 'done',
   us: 'warning',
   unknown: 'idle',
@@ -83,7 +86,7 @@ const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
  * @returns the trigger and, while open, the two-level menu.
  */
 export function ModelSelect(
-  { locked, available, directory, load, select, residency, t }:
+  { locked, available, directory, load, select, residencyLabel, t }:
   ModelSelectInjected & { locked: boolean } & PropsLocale<'model'>,
 ) {
   const state = useSyncExternalStore(
@@ -583,8 +586,13 @@ export function ModelSelect(
                       {group.models.map((model) => {
                         const index = modelIndex++
                         const selected = state.current?.provider === group.id && state.current.model === model.id
-                        // Fail-soft: sin guardia montada el lector contesta undefined y no hay etiqueta.
-                        const route = residency?.(group.id, model.id)
+                        // La residencia viaja EN el modelo, resuelta por el Host
+                        // al servir el catalogo: no se pregunta a ninguna
+                        // guardia del navegador. Fail-soft: un modelo sin
+                        // residencia, o una composicion sin la cara de textos de
+                        // la marca, no pintan etiqueta.
+                        const residency = model.residency
+                        const badge = residency === undefined ? undefined : residencyLabel?.(residency)
                         return (
                           <button
                             ref={itemRef()}
@@ -609,10 +617,10 @@ export function ModelSelect(
                           >
                             <span className={css.optionCopy}>
                               <span className={css.modelName}>{model.name}</span>
-                              {route !== undefined && (
-                                <span className={css.residency} data-residency={route.kind}>
-                                  <StateDot state={RESIDENCY_DOT[route.kind]} />
-                                  <span className={css.residencyLabel}>{route.label}</span>
+                              {residency !== undefined && badge !== undefined && (
+                                <span className={css.residency} data-residency={residency}>
+                                  <StateDot state={RESIDENCY_DOT[residency]} />
+                                  <span className={css.residencyLabel}>{badge}</span>
                                 </span>
                               )}
                             </span>

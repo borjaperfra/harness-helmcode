@@ -7,7 +7,7 @@ kind: "package-reference"
 
 ## Summary
 
-This package decides two things and no more: whether a model route may leave the EU, and whether a tool that opens its own network traffic may run. `eu-only` denies every residence that is not exactly `eu`; `ask` denies non-European routes, because there is no consent channel for one model call; `open` allows everything and is the default, since the mode is a deployment's decision about its own data. A denial is an error with its own code and reason, never a silent model substitution. Its read face, `ctx.guardEuRouting`, reports a route's declared residence for the Web selector.
+This package decides two things: whether a model route may leave the EU, and whether a tool that opens its own network traffic may run. `eu-only` denies every residence that is not exactly `eu`; `ask` denies non-European routes, because no consent channel exists for one model call; `open` allows everything and is the default, since the mode is a deployment's decision about its own data. A denial is an error with its own code and reason, never a silent substitution. Its Host-only read face, `ctx.guardEuRouting`, reports a route's declared residence, which the served model catalog carries to the Web selector.
 
 ## Table of Contents
 
@@ -54,6 +54,8 @@ A denied route throws before any adapter is reached, so the call fails with `RES
 
 While the guard is mounted, `ctx.guardEuRouting.residency(provider, model)` answers `'eu'`, `'us'` or `'unknown'` from the same effective table the verdicts use — the defaults plus whatever the profile adds. It is a read: it vetoes nothing, and it is honest about the absence of an entry (`'unknown'` is what `eu-only` denies, not a neutral value). Consumers ask for it optionally (`ctx.get('guardEuRouting')`), so a composition without the guard mounts its readers unchanged.
 
+The Host asks it once per model catalog and carries the answer on each `ModelCatalogModel`, so the Web selector labels every row from the model it is already rendering. A profile-added residency entry therefore reaches the badge instead of being read as `'unknown'` there, and no browser-side copy of the table exists to disagree with the veto. Without a mounted guard every route travels as `'unknown'`: nobody declared where it runs, which is the same reading the veto gives it.
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -71,7 +73,7 @@ The guard is built on four commitments:
 - **Default-deny in `eu-only`.** The residency table is a closed whitelist read as `table[key] ?? 'unknown'`, so neither model discovery nor a future provider inherits a permission nobody granted it.
 - **Refuse, never degrade or ask in silence.** Changing the model or letting one call through changes how a regulated customer's data is treated, and that is a human decision. The plugin has no consent channel for a single model call, so `ask` denies non-European routes and explains that `open` is how a deployment authorizes egress knowingly.
 - **Pure core, wired twice.** `decisions.ts` imports nothing, so every verdict is a function of its arguments and is provable without mounting the harness; `index.ts` asks the core and obeys it.
-- **One table, two readers.** The verdicts and the published read face both call `declaredResidency`, so the label a person sees and the veto they get cannot drift apart.
+- **One table, one reader, and the wire.** The verdicts and the published read face both call `declaredResidency`, and the model catalog is served from that read face, so the label a person sees and the veto they get cannot drift apart.
 - **Two seams, because one is not enough.** `llm/stream` covers every streaming model call, but external subagent CLIs, MCP servers and `web_fetch`/`web_search` open their own traffic outside it, so `tools/pre-execute` is where those are vetoed.
 
 ### Where the verdicts land
@@ -86,8 +88,7 @@ The `llm/stream` listener calls `decideModelRoute` and throws an `LlmError` carr
 | [`src/decisions.ts`](src/decisions.ts) | The pure decision core (`decideModelRoute`, `decideTool`, `declaredResidency`, `routeKey`, both tables' types) with no imports |
 | [`src/defaults.ts`](src/defaults.ts) | The default residency table and the default egress-tool whitelist, each entry with its provenance |
 | [`src/residency.ts`](src/residency.ts) | The `ctx.guardEuRouting` read face (`residency`) and the reader factory over one table |
-| [`src/client/index.ts`](src/client/index.ts) | Browser half: publishes the same read face over the default table, which is what the Web model selector consumes |
-| — | No runtime invariant companion is published because the guard owns no package-local event history or mutable data relation: it reads its tables and returns a verdict. |
+| — | No browser half is published: it existed only to label the Web model selector from the DEFAULT table, which is exactly the disagreement this package's effective-table read face now prevents — the Host stamps residency onto the model catalog instead. No runtime invariant companion is published because the guard owns no package-local event history or mutable data relation: it reads its tables and returns a verdict. |
 
 </details>
 
@@ -147,7 +148,7 @@ These limits define when the guard is a poor fit. They are current package const
 - **`ask` cannot ask.** There is no per-model-call approval seam, so `ask` denies every non-European residence and says so in the reason; the harness approval seam is per tool and fail-closed.
 - **Residency is a declaration.** `'eu'` is what the table states, never a measurement of where inference ran or which route the bytes took; the guard certifies nothing about the network.
 - **The default mode is `open`.** A deployment that needs the guarantee must declare `eu-only` in its own profile, because a shared bundle also serves machines that are not regulated deployments.
-- **The browser read face sees the default table only.** The browser Loader creates each entry without configuration, so residency entries a profile adds are not visible to `ctx.guardEuRouting` in the Web client and read as `'unknown'` there; the veto is unaffected, because the host decides it with the effective table.
+- **There is no browser side of this package.** The retired browser half published a read face over the DEFAULT table, the only one the browser Loader can build (it creates each entry without configuration). A residency entry the deployment's profile added was therefore invisible there: the badge read `unknown` for a route whose declared residence was `eu`, while the Host veto allowed the call with the effective table. The read face is Host-only now and the model catalog carries its reading to the interface; the veto is unaffected, because it always happened on the Host, with the effective table.
 
 <a id="dev-note"></a>
 ### Dev Note
