@@ -2216,6 +2216,9 @@ importers:
       '@deepseek-ai/dsh-privacy-helmcode':
         specifier: workspace:*
         version: link:../../guard/privacy-helmcode
+      '@deepseek-ai/dsh-quota-helmcode':
+        specifier: workspace:*
+        version: link:../../llm/quota-helmcode
       '@deepseek-ai/dsh-retrieval-helmcode':
         specifier: workspace:*
         version: link:../../retrieval/helmcode

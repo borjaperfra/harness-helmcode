@@ -288,3 +288,16 @@
       # config:
       #   defaultOperator: <nombre del operador>
       #   requireOperator: true
+
+    # Medidor local de cuota: registra la proyeccion de sesion `quotaEstimate`,
+    # que pliega los eventos `assistant/message` y acumula tokens por cubo del
+    # plan. Es un ESTIMADOR: el limite real es por key y por organizacion, y
+    # quien lo conoce es la consola de Helmcode. La tarjeta que lo pinta vive en
+    # `ui-brand-helmcode` y lo lee por el cable de la sesion.
+    #
+    # Cubre las rutas `helmcode` y `nan-builders`: el dueño confirmo que NaN
+    # Builders es su suscripcion de Helmcode, asi que ambas dibujan de la misma
+    # cuota. Sin `config`: el plan asumido es el defecto de la tabla, y el
+    # perfil puede declarar otro.
+    - id: quota-helmcode
+      name: '@deepseek-ai/dsh-quota-helmcode'
