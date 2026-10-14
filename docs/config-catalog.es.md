@@ -2890,6 +2890,37 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-skill-office -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-speech-to-text-helmcode -->
+<a id="deepseek-aidsh-speech-to-text-helmcode"></a>
+
+## `@deepseek-ai/dsh-speech-to-text-helmcode`
+
+- `inject`: `speechToText` · `credentials`
+- `source`: [`packages/speech/speech-to-text-helmcode/src/index.ts:101`](../packages/speech/speech-to-text-helmcode/src/index.ts)
+
+```ts config-catalog
+/** La configuracion del plugin, tal como la declara el perfil. */
+export interface Config {
+  /** Id del proveedor registrado. Ausente: {@link DEFAULT_PROVIDER_ID}. */
+  providerId?: string
+  /** Referencia de credencial de la clave. Ausente: {@link DEFAULT_API_KEY_REF}. */
+  apiKeyRef?: string
+  /** Raiz de la API, sin `/v1`. Ausente: {@link DEFAULT_BASE_URL}. */
+  baseURL?: string
+  /** Modelo pedido al endpoint. Ausente: {@link DEFAULT_MODEL}. */
+  model?: string
+  /** Duracion objetivo de cada segmento. Ausente: {@link DEFAULT_SEGMENT_SECONDS}. */
+  segmentSeconds?: number
+  /** Limite de bytes por peticion. Ausente: {@link MAX_REQUEST_BYTES}. */
+  maxRequestBytes?: number
+  /** Reintentos de un 429; `0` los desactiva. Ausente: {@link DEFAULT_MAX_RETRIES}. */
+  maxRetries?: number
+  /** Espera tras un 429 sin `Retry-After`. Ausente: {@link DEFAULT_RETRY_DELAY_MS}. */
+  retryDelayMs?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-speech-to-text-helmcode -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-spill-local -->
 <a id="deepseek-aidsh-spill-local"></a>
 
@@ -4400,6 +4431,7 @@ Se cargan desde una entrada de `cordis.yml` sin bloque `config:`; no declaran ni
 | `@deepseek-ai/dsh-llm` | — | [`packages/llm/llm/src/index.ts`](../packages/llm/llm/src/index.ts) |
 | `@deepseek-ai/dsh-lsp` | — | [`packages/lsp/lsp/src/index.ts`](../packages/lsp/lsp/src/index.ts) |
 | `@deepseek-ai/dsh-mcp-resources` | `tools` | [`packages/mcp/mcp-resources/src/index.ts`](../packages/mcp/mcp-resources/src/index.ts) |
+| `@deepseek-ai/dsh-quota-helmcode` | `sessionProjections` | [`packages/llm/quota-helmcode/src/index.ts`](../packages/llm/quota-helmcode/src/index.ts) |
 | `@deepseek-ai/dsh-sandbox-ssh` | `ssh` | [`packages/ssh/sandbox-ssh/src/index.ts`](../packages/ssh/sandbox-ssh/src/index.ts) |
 | `@deepseek-ai/dsh-session` | — | [`packages/core/session/src/index.ts`](../packages/core/session/src/index.ts) |
 | `@deepseek-ai/dsh-session-checkpoint-policy` | `llm` · `sessionPersistence` · `sessions` · `tools` | [`packages/session/session-checkpoint-policy/src/index.ts`](../packages/session/session-checkpoint-policy/src/index.ts) |
@@ -4485,7 +4517,6 @@ Otros paquetes los importan como bibliotecas; un `cordis.yml` no puede cargarlos
 | `@deepseek-ai/dsh-native-command` | — | [`packages/util/native-command/src/index.ts`](../packages/util/native-command/src/index.ts) |
 | `@deepseek-ai/dsh-output-retention` | — | [`packages/util/output-retention/src/index.ts`](../packages/util/output-retention/src/index.ts) |
 | `@deepseek-ai/dsh-package-manifest` | — | [`packages/util/package-manifest/src/index.ts`](../packages/util/package-manifest/src/index.ts) |
-| `@deepseek-ai/dsh-quota-helmcode` | — | [`packages/llm/quota-helmcode/src/index.ts`](../packages/llm/quota-helmcode/src/index.ts) |
 | `@deepseek-ai/dsh-remote-mock` | — | [`packages/test-support/remote-mock/src/index.ts`](../packages/test-support/remote-mock/src/index.ts) |
 | `@deepseek-ai/dsh-sandbox-windows-acl` | — | [`packages/sandbox/sandbox-windows-acl/src/index.ts`](../packages/sandbox/sandbox-windows-acl/src/index.ts) |
 | `@deepseek-ai/dsh-scope` | — | [`packages/core/scope/src/index.ts`](../packages/core/scope/src/index.ts) |
