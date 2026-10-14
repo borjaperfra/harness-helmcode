@@ -30,16 +30,15 @@ export type {} from '@deepseek-ai/dsh-session-projection/types'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm'
 import {
-  DEFAULT_PLAN, KEY_LIMITS, NAN_PROVIDER, bucketOf, largestBucket, quotaState,
+  DEFAULT_PLAN, KEY_LIMITS, bucketOf, largestBucket, quotaState,
   type QuotaBucket,
 } from './limits.ts'
-import type { MeasuredBucket, QuotaEstimateView } from './types.ts'
+import type { QuotaEstimateView } from './types.ts'
 
 /**
- * Los cubos en el orden fijo en que la vista los publica: los tres de la cuota
- * de Helmcode y, al final, el de la ruta NaN, que no es cuota del plan.
+ * Los cubos en el orden fijo en que la vista los publica.
  */
-const BUCKETS: readonly MeasuredBucket[] = ['sota', 'addon', 'unlimited', 'nan']
+const BUCKETS: readonly QuotaBucket[] = ['sota', 'addon', 'unlimited']
 
 /** La ventana deslizante de la tasa de peticiones, en milisegundos. */
 export const RPM_WINDOW_MS = 60_000
@@ -63,12 +62,6 @@ export interface QuotaEstimateState {
   addon: BucketUsage | null
   /** Consumo del cubo sin tope. */
   unlimited: BucketUsage | null
-  /**
-   * Consumo de la ruta NaN, en su cubo aparte: no es cuota de Helmcode y no
-   * tiene tope publicado, asi que solo acumula tokens (con sus tiempos, que la
-   * ventana de rpm de la clave NO usa).
-   */
-  nan: BucketUsage | null
   /** La vista publicada; se pliega con el estado para que su referencia sea estable. */
   view: QuotaEstimateView
 }
@@ -118,15 +111,13 @@ function accumulate(
  * @returns la estimacion actual, con el cubo de mayor consumo senalado.
  */
 function projectView(
-  measured: Pick<QuotaEstimateState, 'sota' | 'addon' | 'unlimited' | 'nan'>,
+  measured: Pick<QuotaEstimateState, 'sota' | 'addon' | 'unlimited'>,
 ): QuotaEstimateView {
   const used: Record<QuotaBucket, number> = {
     sota: measured.sota?.usedTokens ?? 0,
     addon: measured.addon?.usedTokens ?? 0,
     unlimited: measured.unlimited?.usedTokens ?? 0,
   }
-  // Los tiempos de los cubos de Helmcode forman una sola tasa por key: el limite
-  // de rpm es de la clave. Los de NaN NO entran: esa ruta no gasta esa clave.
   const fresh = [
     ...(measured.sota?.timestamps ?? []),
     ...(measured.addon?.timestamps ?? []),
@@ -142,7 +133,7 @@ function projectView(
     window: { rpm: fresh.length, limit: KEY_LIMITS.requestsPerMinute },
     buckets: BUCKETS.map(bucket => ({
       bucket,
-      usedTokens: bucket === 'nan' ? measured.nan?.usedTokens ?? 0 : used[bucket],
+      usedTokens: used[bucket],
     })),
   }
 }
@@ -170,13 +161,12 @@ const quotaEstimateStateSchema = z.object({
   sota: bucketUsageStateSchema.nullable(),
   addon: bucketUsageStateSchema.nullable(),
   unlimited: bucketUsageStateSchema.nullable(),
-  nan: bucketUsageStateSchema.nullable(),
   view: quotaEstimateSchema,
 }).strict()
 
 /** La vista de una sesion sin ninguna llamada medida. */
 function emptyView(): QuotaEstimateView {
-  return projectView({ sota: null, addon: null, unlimited: null, nan: null })
+  return projectView({ sota: null, addon: null, unlimited: null })
 }
 
 /**
@@ -202,9 +192,8 @@ export function foldQuotaEstimate(state: QuotaEstimateState, event: SessionEvent
   // recibiria `undefined` en lugar de un cubo.
   // oxlint-disable-next-line typescript/no-unnecessary-condition -- log duradero, no solo el tipo en memoria
   if (source.kind !== 'model') return state
-  const measured: MeasuredBucket | undefined =
+  const measured: QuotaBucket | undefined =
     bucketOf(source.provider, source.model)
-    ?? (source.provider === NAN_PROVIDER ? 'nan' : undefined)
   if (measured === undefined) return state
   const tokens = usageTokens(event.data.usage)
   const cutoff = event.time - RPM_WINDOW_MS
@@ -229,7 +218,7 @@ export const quotaEstimateProjectionDefinition = {
   key: 'quotaEstimate',
   stateVersion: 1,
   stateSchema: quotaEstimateStateSchema,
-  init: () => ({ sota: null, addon: null, unlimited: null, nan: null, view: emptyView() }),
+  init: () => ({ sota: null, addon: null, unlimited: null, view: emptyView() }),
   apply: foldQuotaEstimate,
   wire: {
     viewSchema: quotaEstimateSchema,

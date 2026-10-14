@@ -23,7 +23,7 @@ import LocalCredentialProvider from '@deepseek-ai/dsh-credentials-local'
 import { LocalFileSystem } from '@deepseek-ai/dsh-fs-local'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime from '@deepseek-ai/dsh-tools'
+import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
 import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import * as privacy from '../src/index.ts'
 
@@ -75,6 +75,8 @@ async function harness(options: {
   mapKeyRef?: string
   ttlDays?: number
   withoutFs?: boolean
+  vetoDirectReads?: boolean
+  exposeAnonymize?: boolean
 } = {}): Promise<Harness> {
   const root = mkdtempSync(join(tmpdir(), 'dsh-privacy-'))
   roots.push(root)
@@ -94,6 +96,8 @@ async function harness(options: {
     mapPath,
     ...(options.mapKeyRef === undefined ? {} : { mapKeyRef: options.mapKeyRef }),
     ...(options.ttlDays === undefined ? {} : { ttlDays: options.ttlDays }),
+    ...(options.vetoDirectReads === undefined ? {} : { vetoDirectReads: options.vetoDirectReads }),
+    ...(options.exposeAnonymize === undefined ? {} : { exposeAnonymize: options.exposeAnonymize }),
   })
   return { ctx, root, home, workspace, mapPath }
 }
@@ -441,5 +445,105 @@ describe('workspace_read_anonymized', () => {
     expect(textOf(limited)).toContain('exceed the 4-byte cap')
     expect(allowed.isError).toBe(false)
     expect(bodyOf(allowed)).toBe('DNI [DNI_1]\n')
+  })
+})
+
+/** Registra una herramienta sonda que solo deja constancia de si su cuerpo corrio. */
+function registerProbeTool(ctx: Context, toolName: string): () => boolean {
+  let executed = false
+  ctx.tools.register(defineContentToolFixture({
+    name: toolName,
+    description: 'sonda',
+    parameters: {},
+    async execute() {
+      executed = true
+      return [{ type: 'text' as const, text: 'ok' }]
+    },
+  }))
+  return () => executed
+}
+
+describe('vetoDirectReads: el veto de lecturas directas es del HOST', () => {
+  it('la politica es una funcion pura de (herramienta, configuracion)', () => {
+    expect(privacy.DIRECT_READ_TOOLS).toEqual(['read', 'grep', 'glob'])
+    expect(privacy.shouldVetoRead('read', true)).toBe(true)
+    expect(privacy.shouldVetoRead('grep', true)).toBe(true)
+    expect(privacy.shouldVetoRead('glob', true)).toBe(true)
+    expect(privacy.shouldVetoRead('read', false)).toBe(false)
+    expect(privacy.shouldVetoRead('write', true)).toBe(false)
+    expect(privacy.shouldVetoRead('workspace_read_anonymized', true)).toBe(false)
+  })
+
+  it('veta read, grep y glob en el pipeline y manda a la lectura anonimizada', async () => {
+    const h = await harness({ key: KEY, vetoDirectReads: true })
+    const read = registerProbeTool(h.ctx, 'read')
+    const grep = registerProbeTool(h.ctx, 'grep')
+    const glob = registerProbeTool(h.ctx, 'glob')
+
+    for (const [name, executed] of [['read', read], ['grep', grep], ['glob', glob]] as const) {
+      const result = await call(h, name, {})
+      expect(executed()).toBe(false)
+      expect(result.isError).toBe(true)
+      expect(textOf(result)).toContain('[DIRECT_READ_VETOED]')
+      expect(textOf(result)).toContain(name)
+      expect(textOf(result)).toContain('workspace_read_anonymized')
+      expect(result.error?.info).toEqual({ name: 'DirectReadVetoedError', code: 'DIRECT_READ_VETOED' })
+    }
+  })
+
+  it('sin la politica no se registra veto y las lecturas normales siguen su curso', async () => {
+    const h = await harness({ key: KEY })
+    const read = registerProbeTool(h.ctx, 'read')
+
+    const result = await call(h, 'read', {})
+
+    expect(read()).toBe(true)
+    expect(result.isError).toBe(false)
+  })
+
+  it('la lectura anonimizada no la alcanza el veto: es el unico camino que queda', async () => {
+    const h = await harness({ key: KEY, vetoDirectReads: true })
+    writeFileSync(join(h.workspace, 'notas.txt'), `Titular: ${DNI}\n`)
+
+    const result = await call(h, 'workspace_read_anonymized', { path: 'notas.txt' }, true)
+
+    expect(result.isError).toBe(false)
+    expect(bodyOf(result)).toBe('Titular: [DNI_1]\n')
+  })
+})
+
+describe('exposeAnonymize: la herramienta se puede retirar del perfil', () => {
+  it('con `false` no publica `anonymize` y deja el resto del canal intacto', async () => {
+    const h = await harness({ key: KEY, exposeAnonymize: false })
+    const names = h.ctx.tools.schemas().map(schema => schema.name)
+
+    expect(names).not.toContain('anonymize')
+    expect(names).toContain('workspace_read_anonymized')
+
+    // La lectura anonimizada sigue sellando el mapa, y el seam sigue vivo.
+    writeFileSync(join(h.workspace, 'notas.txt'), `Titular: ${DNI}\n`)
+    expect(bodyOf(await call(h, 'workspace_read_anonymized', { path: 'notas.txt' }, true))).toBe('Titular: [DNI_1]\n')
+    expect(mapOnDisk(h.mapPath, KEY).lookup(DNI)?.placeholder).toBe('[DNI_1]')
+    expect(await h.ctx.privacy?.redact(`Movil ${TEL}.`)).toBe('Movil [TEL_1].')
+  })
+})
+
+describe('retencion: el mapa sellado PURGA lo caducado', () => {
+  it('una entrada vencida desaparece del fichero en la siguiente mutacion', async () => {
+    const h = await harness({ key: KEY })
+    // Un mapa en disco con una entrada ya vencida, sellado como lo estaria el de
+    // un perfil que estuvo en uso hasta que su retencion la alcanzo.
+    const stale = new privacy.RedactionMap()
+    stale.assign('DNI', DNI, { createdAt: new Date('2024-01-01T00:00:00.000Z'), expiresAt: new Date('2024-01-08T00:00:00.000Z') })
+    writeFileSync(h.mapPath, privacy.seal(stale.toJSON(), KEY))
+
+    // Cualquier mutacion purga: aqui, una redaccion sin PII nueva.
+    const result = await call(h, 'anonymize', { text: 'Sin datos personales.' })
+
+    expect(result.isError).toBe(false)
+    const after = mapOnDisk(h.mapPath, KEY)
+    expect(after.lookup(DNI)).toBeUndefined()
+    expect(after.toJSON()).not.toContain('[DNI_1]')
+    expect(() => after.resolve('[DNI_1]', new Date())).toThrow(privacy.UnknownPlaceholderError)
   })
 })

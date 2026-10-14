@@ -91,3 +91,7 @@ console.log(JSON.stringify({ paths: app.paths, home: process.env.DSH_HOME, journ
     })
   })
 })
+
+// El origen del feed de prueba lo declara el despliegue en el dotenv del destino;
+// el test lo fija aqui para que los manifestos creados por el allocator sean validos.
+process.env.DOWNLOAD_TEST_ORIGIN ??= 'https://download-test.deepseek.com'

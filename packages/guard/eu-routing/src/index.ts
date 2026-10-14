@@ -19,9 +19,9 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import type { PreToolDecision, ToolErrorInfo } from '@deepseek-ai/dsh-tools'
-import { decideModelRoute, decideTool } from './decisions.ts'
-import type { EgressToolTable, ResidencyMode, ResidencyTable } from './decisions.ts'
-import { DEFAULT_EGRESS_TOOLS, DEFAULT_RESIDENCY_TABLE } from './defaults.ts'
+import { decideModelRoute, decideRouteEndpoint, decideTool } from './decisions.ts'
+import type { EgressToolTable, ResidencyEndpointTable, ResidencyMode, ResidencyTable } from './decisions.ts'
+import { DEFAULT_EGRESS_TOOLS, DEFAULT_RESIDENCY_ENDPOINTS, DEFAULT_RESIDENCY_TABLE } from './defaults.ts'
 import { residencyReader } from './residency.ts'
 import type { GuardEuRouting } from './residency.ts'
 
@@ -65,6 +65,13 @@ export interface Config {
   /** Entradas de residencia que se SUMAN a las de por defecto (misma clave: gana la del perfil). */
   residency?: ResidencyTable
   /**
+   * URL base esperada por proveedor, que se SUMA a
+   * {@link DEFAULT_RESIDENCY_ENDPOINTS} (misma clave: gana la del perfil). Sirve
+   * para un despliegue cuya ruta europea no es la del bundle; declarar aqui el
+   * endpoint real es lo que hace que la residencia declarada siga siendo cierta.
+   */
+  endpoints?: Record<string, string>
+  /**
    * Reglas de egreso que se SUMAN a las de por defecto. `tools` se declara
    * mutable porque es la ENTRADA de configuracion, que es como la valida
    * Schemastery; al leerla satisface {@link EgressToolTable}.
@@ -93,10 +100,57 @@ export interface Config {
 export const Config: z<Config> = z.object({
   mode: z.union(['eu-only', 'ask', 'open'] as const).default('open'),
   residency: z.dict(z.union(['eu', 'us', 'unknown'] as const)).default({}),
+  endpoints: z.dict(z.string()).default({}),
   egressTools: z.object({
     tools: z.array(z.string()).default([...DEFAULT_EGRESS_TOOLS.tools]),
   }).default({}),
 })
+
+/**
+ * La URL base RESUELTA de una ruta, leida del seam de ajustes cuando la
+ * composicion lo monta.
+ *
+ * El `baseURL` de una ruta no viaja en `GenerateOptions` —el waterfall
+ * `llm/stream` recibe proveedor, modelo y mensajes— ni lo publica el seam de
+ * LLM: vive en la configuracion de la fila `llm-pi-ai`, que
+ * `ctx.settings.describe()` proyecta como el valor VIVO de cada entrada. Esta
+ * funcion la busca por el id del proveedor dentro de `providers`, que es la forma
+ * que ese perfil declara (`packages/bundle/helmcode/cordis.patch.yml:128`).
+ *
+ * El seam es OPCIONAL y se lee en cada llamada: sin el, esta funcion devuelve
+ * `undefined` y la guardia no puede contradecir lo que la tabla afirma (no se
+ * inventa un host). Leerlo es una pregunta a un servicio, no un fallo.
+ *
+ * @param ctx - contexto del plugin.
+ * @param provider - el id del proveedor de la ruta.
+ * @returns la URL base declarada para ese proveedor, si se puede observar.
+ */
+function observedBaseURL(ctx: Context, provider: string): string | undefined {
+  const settings: unknown = ctx.get('settings')
+  const describe = (settings as { describe?: unknown } | undefined)?.describe
+  if (typeof describe !== 'function') return undefined
+  let rows: unknown
+  try {
+    rows = (describe as () => unknown).call(settings)
+  } catch {
+    // Un seam que se niega a describirse no es un permiso ni una prueba de
+    // egreso: la guardia sigue con lo que si puede comprobar.
+    return undefined
+  }
+  if (!Array.isArray(rows)) return undefined
+  for (const row of rows) {
+    if (typeof row !== 'object' || row === null) continue
+    const value = (row as { value?: unknown }).value
+    if (typeof value !== 'object' || value === null) continue
+    const providers = (value as { providers?: unknown }).providers
+    if (typeof providers !== 'object' || providers === null) continue
+    const route = (providers as Record<string, unknown>)[provider]
+    if (typeof route !== 'object' || route === null) continue
+    const baseURL = (route as { baseURL?: unknown }).baseURL
+    if (typeof baseURL === 'string' && baseURL.length > 0) return baseURL
+  }
+  return undefined
+}
 
 /** La identidad estructurada del veto por herramienta, junto a su codigo. */
 const EGRESS_TOOL_DENIED_ERROR_NAME = 'EgressToolDeniedError'
@@ -116,6 +170,7 @@ const EGRESS_TOOL_DENIED_ERROR_NAME = 'EgressToolDeniedError'
 export function apply(ctx: Context, config: Config = {}): void {
   const mode = config.mode ?? 'open'
   const residency: ResidencyTable = { ...DEFAULT_RESIDENCY_TABLE, ...config.residency }
+  const endpoints: ResidencyEndpointTable = { ...DEFAULT_RESIDENCY_ENDPOINTS, ...config.endpoints }
   const egressTools: EgressToolTable = {
     tools: [...DEFAULT_EGRESS_TOOLS.tools, ...config.egressTools?.tools ?? []],
   }
@@ -145,6 +200,16 @@ export function apply(ctx: Context, config: Config = {}): void {
       // `LlmError` —y en el mensaje— para que el consumidor enrute por el y no
       // por el texto de la razon.
       throw new LlmError(`[${verdict.code}] ${verdict.reason}`, verdict.code)
+    }
+    // 1b. La residencia no es solo el nombre de la ruta: se comprueba tambien el
+    //     ENDPOINT al que llega. Si el perfil cambio el `baseURL` de una ruta
+    //     declarada europea, la declaracion ya no la cubre y el veto lo dice
+    //     nombrando el host real. Sin URL observable no hay comparacion posible
+    //     (ver `observedBaseURL`), y en `open` no hay politica que aplicar.
+    const endpoint = decideRouteEndpoint(mode, endpoints, options.provider, options.model,
+      observedBaseURL(ctx, options.provider))
+    if (endpoint.kind === 'deny') {
+      throw new LlmError(`[${endpoint.code}] ${endpoint.reason}`, endpoint.code)
     }
     // Camino permitido: se delega sin consumir el stream.
     return next()

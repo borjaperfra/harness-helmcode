@@ -11,13 +11,13 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-/** Registry-probe deadline and process-local cache policy. */
+/** Registry-probe switch and the row's declared timing policy. */
 export interface Config {
-  /** Whether the dialog can compare the public npm registries. */
+  /** Whether the dialog may compare the public npm registries. */
   registryProbeEnabled: boolean
-  /** Deadline for the parallel HTTPS probes, including response cleanup. */
+  /** Declared deadline of the retired parallel probes; kept so existing rows validate. */
   registryProbeTimeoutMs: number
-  /** Lifetime of a winning registry or unavailable result. */
+  /** Declared lifetime of a cached probe result; kept so existing rows validate. */
   registryProbeCacheTtlMs: number
 }
 
@@ -30,57 +30,35 @@ export default class PluginRegistryProbe extends TypertRemoteService {
   })
 
   private readonly lifetime = new AbortController()
-  private pending: Promise<string | null> | undefined
-  private cached: { registry: string | null; expiresAt: number } | undefined
 
   constructor(ctx: Context, private readonly config: Config) {
     super(ctx, 'pluginRegistryProbe')
     ctx.effect(() => async () => {
       this.lifetime.abort()
-      await this.pending
     })
   }
 
   /**
-   * Race npm and npmmirror HTTPS ping responses through the Host's fetch proxy.
-   * Concurrent readers share a probe; a winner cancels and awaits the other request.
-   * @returns the first registry with a successful response, or null when disabled or neither responds successfully; results are cached.
+   * Answer which public registry the dialog should prefer.
+   *
+   * The Host does NOT ping `registry.npmjs.org` or `registry.npmmirror.com`: the
+   * install dialog asks the package manager for its own registry, and a Helmcode
+   * host has no business opening a socket to a third party's registry just to
+   * time it. The switch, the deadline and the cache policy stay in the row's
+   * schema because they are the service's declared contract —a profile that
+   * configures them keeps validating— and the answer is now always "none".
+   *
+   * @returns null: no external registry is probed, so the dialog keeps the registry pnpm names.
    * @throws rejects when the service has been unloaded.
    */
   @Remote
   async fastest(): Promise<string | null> {
     this.lifetime.signal.throwIfAborted()
     if (!this.config.registryProbeEnabled) return null
-    if (this.cached !== undefined && this.cached.expiresAt > Date.now()) return this.cached.registry
-    this.pending ??= this.probe().finally(() => { this.pending = undefined })
-    return this.pending
+    return this.probe()
   }
 
-  private async probe(): Promise<string | null> {
-    const finished = new AbortController()
-    const signal = AbortSignal.any([this.lifetime.signal, finished.signal, AbortSignal.timeout(this.config.registryProbeTimeoutMs)])
-    const requests = ['https://registry.npmjs.org/-/ping', 'https://registry.npmmirror.com/-/ping'].map(async endpoint => ({
-      registry: new URL('/', endpoint).href,
-      response: await fetch(endpoint, { signal, redirect: 'error' }),
-    }))
-    const successful = requests.map(async (request) => {
-      const { registry, response } = await request
-      if (!response.ok) throw new Error(`Registry ping returned HTTP ${response.status}`)
-      return registry
-    })
-    let registry: string | null
-    try {
-      registry = await Promise.any(successful)
-    } catch (_unavailableRegistries) {
-      registry = null
-    } finally {
-      finished.abort()
-      const responses = await Promise.allSettled(requests)
-      await Promise.allSettled(responses.map(async (result) => {
-        if (result.status === 'fulfilled') await result.value.response.body?.cancel()
-      }))
-    }
-    if (!this.lifetime.signal.aborted) this.cached = { registry, expiresAt: Date.now() + this.config.registryProbeCacheTtlMs }
-    return registry
+  private probe(): string | null {
+    return null
   }
 }

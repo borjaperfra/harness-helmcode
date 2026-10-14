@@ -101,6 +101,20 @@ export interface EgressToolTable {
 }
 
 /**
+ * La URL base que la tabla de residencia declara para cada proveedor.
+ *
+ * La residencia por `provider/model` dice DONDE corre la inferencia; esta tabla
+ * dice POR DONDE sale la peticion, que es la otra mitad de la misma afirmacion.
+ * Sin ella, cambiar el `baseURL` de una ruta declarada `'eu'` dejaba la guardia
+ * diciendo "UE" mientras el endpoint ya era otro: el nombre del proveedor no es
+ * el destino. La clave es el id del proveedor, porque la URL base es de la ruta
+ * entera y no de un modelo.
+ */
+export interface ResidencyEndpointTable {
+  readonly [provider: string]: string
+}
+
+/**
  * El veredicto de la guardia.
  *
  * `deny` siempre lleva un `code` para que el consumidor enrute por el y no por el
@@ -257,8 +271,7 @@ export function decideTool(
  * Una entrada terminada en `*` es prefijo; cualquier otra es nombre exacto. El
  * orden de la tabla decide, y por eso la tabla se declara de lo concreto a lo
  * general.
- */
-function matchEgressRule(egressTools: EgressToolTable, toolName: string): string | undefined {
+ */function matchEgressRule(egressTools: EgressToolTable, toolName: string): string | undefined {
   for (const entry of egressTools.tools) {
     if (entry.endsWith('*')) {
       if (toolName.startsWith(entry.slice(0, -1))) return entry
@@ -267,4 +280,99 @@ function matchEgressRule(egressTools: EgressToolTable, toolName: string): string
     if (entry === toolName) return entry
   }
   return undefined
+}
+
+/**
+ * Normaliza una URL base para compararla consigo misma y no con su ortografia:
+ * sin barras finales, sin distinguir mayusculas en el host y conservando la RUTA,
+ * que tambien forma parte del destino (un `/v1` servido por otro host no es la
+ * misma ruta).
+ *
+ * @param value - la URL base tal como la declara la configuracion.
+ * @returns la forma comparable, o el valor recortado si no es una URL absoluta.
+ */
+function normalizeBaseURL(value: string): string {
+  const trimmed = value.trim().replace(/\/+$/u, '')
+  try {
+    const parsed = new URL(trimmed)
+    return `${parsed.protocol.toLowerCase()}//${parsed.host.toLowerCase()}${parsed.pathname.replace(/\/+$/u, '')}`
+  } catch {
+    // Una URL que no parsea no se puede normalizar; se compara tal cual, que es
+    // lo mas honesto que se puede hacer con un valor que nadie deberia escribir.
+    return trimmed
+  }
+}
+
+/**
+ * El host de una URL base, solo para nombrarlo en la razon del veto.
+ *
+ * @param value - la URL base observada.
+ * @returns su host, o el valor entero cuando no parsea.
+ */
+function hostOf(value: string): string {
+  try {
+    return new URL(value.trim()).host
+  } catch {
+    return value.trim()
+  }
+}
+
+/**
+ * La URL base que la tabla declara para un proveedor.
+ *
+ * @param table - la tabla de endpoints por proveedor.
+ * @param provider - el id del proveedor de la ruta.
+ * @returns la URL esperada, o `undefined` cuando la tabla no fija ninguna.
+ */
+export function expectedBaseURL(table: ResidencyEndpointTable, provider: string): string | undefined {
+  const value = table[provider]
+  return value === undefined || value.length === 0 ? undefined : value
+}
+
+/**
+ * Decide si la URL base RESUELTA de una ruta respalda la residencia declarada.
+ *
+ * El nombre del proveedor no es el destino: una ruta llamada `helmcode` puede
+ * apuntar a cualquier host si alguien cambia su `baseURL`, y entonces la
+ * residencia `'eu'` de la tabla seria una afirmacion falsa. Esta funcion compara
+ * la URL observada con la esperada del proveedor y veta cuando no coinciden, con
+ * una razon que NOMBRA el host real, para que quien lea el fallo sepa a donde
+ * iba la peticion y no solo que se nego.
+ *
+ * La ausencia de URL observada no veta: una composicion sin el seam de ajustes no
+ * puede contradecir lo que la tabla afirma, y en `eu-only` lo que no tenga
+ * residencia `'eu'` ya queda vetado por {@link decideModelRoute}. Lo que esta
+ * funcion NO puede hacer es inventarse un host.
+ *
+ * @param mode - Modo de la guardia; en `open` no hay politica que aplicar.
+ * @param endpoints - URL base esperada por proveedor.
+ * @param provider - Proveedor de la ruta, tal como lo registra el harness.
+ * @param model - Id del modelo dentro de ese proveedor.
+ * @param baseURL - La URL base resuelta de la ruta, si el host la puede observar.
+ * @returns `allow`, o `deny` con `RESIDENCY_REFUSED` y la razon del veto.
+ */
+export function decideRouteEndpoint(
+  mode: ResidencyMode,
+  endpoints: ResidencyEndpointTable,
+  provider: string,
+  model: string,
+  baseURL: string | undefined,
+): EgressDecision {
+  if (mode === 'open') return allow()
+  const expected = expectedBaseURL(endpoints, provider)
+  // Sin URL observada no hay comparacion posible, y sin expectativa declarada no
+  // hay nada que exigir: la residencia por modelo sigue decidiendo en ambos casos.
+  if (expected === undefined || baseURL === undefined || baseURL.length === 0) return allow()
+  if (normalizeBaseURL(baseURL) === normalizeBaseURL(expected)) return allow()
+
+  return {
+    kind: 'deny',
+    code: 'RESIDENCY_REFUSED',
+    reason:
+      `la ruta "${routeKey(provider, model)}" sale por "${hostOf(baseURL)}", que no es el host que la tabla de `
+      + `residencia declara para el proveedor "${provider}" (esperado: "${hostOf(expected)}"). Una ruta europea lo `
+      + 'es por el endpoint al que llega, no por el nombre con el que se la llama: cambiar el baseURL de una ruta '
+      + 'declarada \'eu\' deja de estar cubierto por esa declaracion. Restaura el endpoint esperado, o cambia a '
+      + '\'open\' y asume el egreso a sabiendas.',
+  }
 }

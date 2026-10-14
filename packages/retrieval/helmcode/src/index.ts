@@ -818,7 +818,10 @@ export function apply(ctx: Context, config: Config = {}): void {
     description:
       'Search the local retrieval index and return the best fragments with their source and score. EGRESS: the '
       + 'query is embedded and the candidates are reranked through the Helmcode API at https://api.helmcode.com/v1 '
-      + '(`/v1/embeddings` and `/v1/rerank`, EU residency). Fail-closed: without a usable key, or when Helmcode '
+      + '(`/v1/embeddings` and `/v1/rerank`, EU residency). When the privacy plugin is mounted, every fragment is '
+      + 'passed through its redaction map BEFORE it is returned, so a hit comes out with the stable placeholders '
+      + '([DNI_1]) instead of the value in the clear, and a map that cannot be opened fails the call instead of '
+      + 'returning raw text. Fail-closed: without a usable key, or when Helmcode '
       + 'answers 401/402, this tool fails with the code and the cause instead of returning fragments that were '
       + 'never retrieved. With an empty index it says so, and it never invents a result: it returns only what the '
       + 'index and the rerank actually produced.',
@@ -883,10 +886,20 @@ export function apply(ctx: Context, config: Config = {}): void {
       const workspace = workspaceIdOf(exec.agent?.session.header.cwd)
       try {
         const outcome = await service.search(args.query, topN, workspace)
-        return {
-          indexed: outcome.indexed,
-          hits: outcome.hits.map(hit => ({ source: hit.source, score: hit.score, text: hit.text })),
-        }
+        // La redaccion va ANTES de devolver: un fragmento es texto de un
+        // documento del workspace, y en un perfil que anonimiza la lectura el
+        // resultado de una busqueda no puede ser una puerta trasera a los bytes
+        // en crudo. Con el mapa montado, un fallo al abrirlo FALLA la llamada
+        // (el seam es de fallo cerrado) en vez de devolver el fragmento entero.
+        const redactor = privacyRedactor(ctx)
+        const hits = redactor === undefined
+          ? outcome.hits.map(hit => ({ source: hit.source, score: hit.score, text: hit.text }))
+          : await Promise.all(outcome.hits.map(async hit => ({
+            source: hit.source,
+            score: hit.score,
+            text: await redactor(hit.text),
+          })))
+        return { indexed: outcome.indexed, hits }
       } catch (error) {
         if (error instanceof RetrievalError) throw asToolFailure(error)
         throw error

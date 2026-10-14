@@ -120,6 +120,51 @@ describe('RedactionMap: resolve niega lo que no puede demostrar', () => {
   })
 })
 
+describe('RedactionMap: purge borra lo caducado', () => {
+  it('elimina las entradas vencidas y deja las vivas y las que no caducan', () => {
+    const map = new RedactionMap()
+    map.assign('DNI', '12345678Z', { expiresAt: new Date('2024-02-01T00:00:00.000Z') })
+    map.assign('TEL', '612345678', { expiresAt: new Date('2024-06-01T00:00:00.000Z') })
+    map.assign('EMAIL', 'ana@bufete.example')
+
+    // El instante de caducidad exacto ya cuenta como vencido, igual que en `resolve`.
+    expect(map.purge(new Date('2024-02-01T00:00:00.000Z'))).toBe(1)
+    expect(map.lookup('12345678Z')).toBeUndefined()
+    expect(map.lookup('612345678')?.placeholder).toBe('[TEL_1]')
+    expect(map.lookup('ana@bufete.example')?.placeholder).toBe('[EMAIL_1]')
+  })
+
+  it('deja el marcador sin restaurar y fuera del documento serializado', () => {
+    const map = new RedactionMap()
+    map.assign('DNI', '12345678Z', { expiresAt: new Date('2024-02-01T00:00:00.000Z') })
+    const before = map.toJSON()
+    expect(before).toContain('[DNI_1]')
+
+    expect(map.purge(new Date('2024-03-01T00:00:00.000Z'))).toBe(1)
+
+    // El marcador sigue en el historial del modelo, pero ya no vuelve a ningun valor:
+    // la entrada no esta y el mapa NIEGA restaurarla.
+    expect(map.toJSON()).not.toContain('[DNI_1]')
+    expect(map.toJSON()).not.toContain('12345678Z')
+    expect(() => map.resolve('[DNI_1]', new Date('2024-03-01T00:00:00.000Z'))).toThrow(UnknownPlaceholderError)
+  })
+
+  it('no reinicia los contadores: un marcador ya emitido no se reutiliza', () => {
+    const map = new RedactionMap()
+    map.assign('DNI', '12345678Z', { expiresAt: new Date('2024-02-01T00:00:00.000Z') })
+    map.purge(new Date('2024-03-01T00:00:00.000Z'))
+
+    expect(map.assign('DNI', '11111111H')).toBe('[DNI_2]')
+  })
+
+  it('sin nada vencido no borra nada, y por defecto usa el ahora', () => {
+    const map = new RedactionMap()
+    map.assign('DNI', '12345678Z', { expiresAt: new Date('2099-01-01T00:00:00.000Z') })
+    expect(map.purge()).toBe(0)
+    expect(map.lookup('12345678Z')?.placeholder).toBe('[DNI_1]')
+  })
+})
+
 describe('RedactionMap: serializacion estable', () => {
   it('ordena las entradas por marcador y las claves siempre igual', () => {
     const map = populated()

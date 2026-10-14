@@ -5,10 +5,10 @@ import { Readable, Writable } from 'node:stream'
 import { cosOperation } from './cos-operation.ts'
 import { createDesktopCos, DESKTOP_COS_REGION } from './desktop-cos.ts'
 import { loadDesktopPackageEnvironment } from './desktop-package-environment.mjs'
+import { requireTestHttpOrigin } from './installed-update-origin.ts'
 import type { InstalledUpdatePublicationStore, InstalledUpdateRemoteObject } from './installed-update-publication.ts'
 
 const BUCKET = 'bj-toc-download-test-1320056602'
-const ORIGIN = 'https://download-test.deepseek.com'
 
 /** COS reports a missing key through this error code; no other status means absence. */
 function isMissingObject(error: unknown): boolean {
@@ -24,15 +24,18 @@ async function hashStream(stream: AsyncIterable<Uint8Array>): Promise<InstalledU
 
 /**
  * Create a fixed test transport from .env.windows, passing only test upload credentials to the SDK.
+ * The public origin is the one the deployment declares (`DOWNLOAD_TEST_ORIGIN`), validated as an
+ * https origin with no path: the transport pins those bytes and no other.
  * Version queries have a 30-second total deadline; object reads and PUTs have 15 minutes.
  * Expiration aborts HTTP requests and waits for closure before releasing the publication operation.
  * @returns Store whose writes are streamed and therefore cannot be repeated by the SDK.
  */
 export function createInstalledUpdateCos(): InstalledUpdatePublicationStore {
   const environment = loadDesktopPackageEnvironment('win32')
-  if (environment.DSH_DESKTOP_AUTO_UPDATE_ENV !== 'test' || environment.DOWNLOAD_TEST_ORIGIN !== ORIGIN
+  if (environment.DSH_DESKTOP_AUTO_UPDATE_ENV !== 'test'
     || environment.DOWNLOAD_TEST_COS_BUCKET !== BUCKET || !environment.DOWNLOAD_TEST_COS_SECRET_ID?.trim()
     || !environment.DOWNLOAD_TEST_COS_SECRET_KEY?.trim()) throw new Error('installed update: complete test upload settings are required')
+  const origin = requireTestHttpOrigin(environment.DOWNLOAD_TEST_ORIGIN)
   const credentials = {
     secretId: environment.DOWNLOAD_TEST_COS_SECRET_ID,
     secretKey: environment.DOWNLOAD_TEST_COS_SECRET_KEY,
@@ -69,7 +72,7 @@ export function createInstalledUpdateCos(): InstalledUpdatePublicationStore {
     },
     async publicRead(url) {
       const parsed = new URL(url)
-      if (parsed.origin !== ORIGIN || parsed.search || parsed.hash) throw new Error('installed update: exact test public URL is required')
+      if (parsed.origin !== origin || parsed.search || parsed.hash) throw new Error('installed update: exact test public URL is required')
       keyAllowed(parsed.pathname.slice(1))
       const response = await fetch(url, { redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(900_000) })
       if (response.status === 404) { await response.body?.cancel(); return null }

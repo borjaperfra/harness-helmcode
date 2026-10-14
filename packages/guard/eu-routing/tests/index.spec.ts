@@ -260,18 +260,21 @@ describe('apply(): modo por defecto y tablas del perfil', () => {
   })
 
   it('la tabla del veto sigue siendo defaults + perfil: el corte del catalogo no la toca', async () => {
-    // Sin perfil, una ruta que nadie declara se veta: la tabla es la lista blanca.
+    // Sin perfil, la ruta NaN que el dueño declaro europea pasa —esta en los
+    // defaults—, y una que nadie declara se sigue vetando: la tabla es la lista blanca.
     const defaults = await services()
     await defaults.plugin(guard, { mode: 'eu-only' })
     const defaultReached = probe(defaults)
-    expect(() => defaults.llm.stream(request('nan-builders', 'glm5.3'))).toThrow(LlmError)
-    expect(defaultReached()).toBe(false)
+    await drain(defaults.llm.stream(request('nan-builders', 'glm5.3')))
+    expect(defaultReached()).toBe(true)
+    expect(() => defaults.llm.stream(request('ajeno', 'lo-que-sea'))).toThrow(LlmError)
 
-    // Con perfil, esa MISMA ruta pasa porque la entrada se SUMA a los defaults...
+    // Con perfil, una ruta que los defaults NO declaran pasa porque la entrada se
+    // SUMA a los defaults...
     const profiled = await services()
-    await profiled.plugin(guard, { mode: 'eu-only', residency: { 'nan-builders/glm5.3': 'eu' } })
+    await profiled.plugin(guard, { mode: 'eu-only', residency: { 'ajeno/lo-que-sea': 'eu' } })
     const profileReached = probe(profiled)
-    await drain(profiled.llm.stream(request('nan-builders', 'glm5.3')))
+    await drain(profiled.llm.stream(request('ajeno', 'lo-que-sea')))
     expect(profileReached()).toBe(true)
 
     // ...y los defaults siguen vetando en la composicion con perfil.
@@ -301,5 +304,106 @@ describe('apply(): modo por defecto y tablas del perfil', () => {
     expect(customResult.error?.info?.code).toBe('EGRESS_TOOL_DENIED')
     expect(defaultEgress()).toBe(false)
     expect(defaultResult.error?.info?.code).toBe('EGRESS_TOOL_DENIED')
+  })
+})
+
+describe('llm/stream: la residencia se comprueba en la URL resuelta de la ruta', () => {
+  /**
+   * Monta la guardia con un seam de ajustes doble: el `baseURL` de la ruta vive
+   * en la configuracion de la fila `llm-pi-ai`, que el Host proyecta a traves de
+   * `describe()`. El doble reproduce esa forma (una fila por entrada, con su
+   * `value.providers[proveedor].baseURL`) sin montar el editor de configuracion.
+   */
+  async function withSettings(settings: unknown, config: Parameters<typeof guard.apply>[1] = { mode: 'eu-only' }) {
+    const ctx = await services()
+    ctx.provide('settings', settings as never)
+    await ctx.plugin(guard, config)
+    return { ctx, reached: probe(ctx) }
+  }
+
+  /** Una observacion que declara el endpoint europeo del bundle. */
+  const european = { describe: () => [{ value: { providers: { helmcode: { baseURL: 'https://api.helmcode.com/v1' } } } }] }
+
+  it('deja pasar la ruta europea cuando la URL observada es la esperada', async () => {
+    const { ctx, reached } = await withSettings(european)
+
+    await drain(ctx.llm.stream(request('helmcode', 'qwen3.6')))
+
+    expect(reached()).toBe(true)
+  })
+
+  it('veta con RESIDENCY_REFUSED y nombra el host real cuando la URL cambio', async () => {
+    const { ctx, reached } = await withSettings({
+      describe: () => [{ value: { providers: { helmcode: { baseURL: 'https://gateway.acme.example/v1' } } } }],
+    })
+
+    let caught: unknown
+    try {
+      ctx.llm.stream(request('helmcode', 'qwen3.6'))
+    } catch (error: unknown) {
+      caught = error
+    }
+
+    expect(caught).toBeInstanceOf(LlmError)
+    expect((caught as LlmError).code).toBe('RESIDENCY_REFUSED')
+    expect((caught as LlmError).message).toContain('gateway.acme.example')
+    expect((caught as LlmError).message).toContain('helmcode/qwen3.6')
+    expect(reached()).toBe(false)
+  })
+
+  it('no veta en `open`, donde no hay politica de residencia que aplicar', async () => {
+    const { ctx, reached } = await withSettings({
+      describe: () => [{ value: { providers: { helmcode: { baseURL: 'https://gateway.acme.example/v1' } } } }],
+    }, { mode: 'open' })
+
+    await drain(ctx.llm.stream(request('helmcode', 'qwen3.6')))
+
+    expect(reached()).toBe(true)
+  })
+
+  it('un perfil puede declarar su propio endpoint esperado', async () => {
+    const { ctx, reached } = await withSettings({
+      describe: () => [{ value: { providers: { helmcode: { baseURL: 'https://api.helmcode.com/v1' } } } }],
+    }, { mode: 'eu-only', endpoints: { helmcode: 'https://gateway.acme.example/v1' } })
+
+    expect(() => ctx.llm.stream(request('helmcode', 'qwen3.6'))).toThrow(LlmError)
+    expect(reached()).toBe(false)
+  })
+
+  it('recorre las filas que no declaran un baseURL utilizable y acepta la que si', async () => {
+    const { ctx, reached } = await withSettings({
+      describe: () => [
+        null,
+        { value: null },
+        { value: { providers: null } },
+        { value: { providers: { helmcode: null } } },
+        { value: { providers: { helmcode: {} } } },
+        { value: { providers: { otro: { baseURL: 'https://otro.example/v1' } } } },
+        { value: { providers: { helmcode: { baseURL: 'https://api.helmcode.com/v1' } } } },
+      ],
+    })
+
+    await drain(ctx.llm.stream(request('helmcode', 'gemma4')))
+
+    expect(reached()).toBe(true)
+  })
+
+  it('sin seam de ajustes, o con uno que no describe nada, la guardia no se inventa un host', async () => {
+    // Sin seam: la composicion no lo monta.
+    const bare = await services()
+    await bare.plugin(guard, { mode: 'eu-only' })
+    expect(() => bare.llm.stream(request('helmcode', 'gpt-6-astra'))).toThrow(LlmError)
+
+    // Con seam pero sin `describe` llamable, y con un `describe` que se niega.
+    for (const settings of [{}, { describe: 42 }, { describe: () => 'no-es-una-lista' }, { describe: () => { throw new Error('sin permiso') } }]) {
+      const ctx = await services()
+      ctx.provide('settings', settings as never)
+      await ctx.plugin(guard, { mode: 'eu-only' })
+      const reached = probe(ctx)
+
+      await drain(ctx.llm.stream(request('helmcode', 'qwen3.6')))
+
+      expect(reached()).toBe(true)
+    }
   })
 })

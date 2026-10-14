@@ -14,6 +14,13 @@
  * si el mapa no se puede escribir, la herramienta FALLA; en ningun camino
  * devuelve el texto sin redactar.
  *
+ * **El veto es del HOST, no de la skill.** Un perfil cuyo tratamiento del dato
+ * exige que todo texto llegue redactado no puede depender de que el modelo
+ * obedezca una instruccion: con `vetoDirectReads` este plugin veta en
+ * `tools/pre-execute` las herramientas que devuelven bytes en crudo (`read`,
+ * `grep`, `glob`) y el unico camino de lectura que queda es
+ * `workspace_read_anonymized`.
+ *
  * El mapa vive entre sesiones (mismo valor → mismo marcador) en la ruta que el
  * perfil declare o, por defecto, en `<DSH_HOME>/privacy/map.v1`, sellado con
  * AES-256-GCM y reemplazado de forma atomica.
@@ -29,7 +36,7 @@ import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import type { ToolExecution } from '@deepseek-ai/dsh-tools'
+import type { PreToolDecision, ToolExecution } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-fs'
 import z from '@deepseek-ai/schemastery'
 import { detectPii, type PiiType } from './detect.ts'
@@ -102,23 +109,63 @@ export interface Config {
   mapKeyRef?: string
   /**
    * Caducidad, en dias, de las entradas NUEVAS del mapa. Ausente: las entradas
-   * no caducan. Una entrada caducada no se restaura (el mapa lo niega), pero su
-   * marcador sigue en el historial.
+   * no caducan. Una entrada caducada no se restaura (el mapa lo niega) y ademas
+   * se BORRA del fichero sellado en la siguiente mutacion (`RedactionMap.purge`),
+   * que es la postura de retencion real: lo caducado no se conserva.
    */
   ttlDays?: number
+  /**
+   * Veto de las herramientas de lectura DIRECTA del workspace (`read`, `grep`,
+   * `glob`) en `tools/pre-execute`. Ausente o `false`: el perfil no lo pide y no
+   * se registra ningun veto, de modo que las lecturas normales siguen su curso.
+   * Con `true`, el host —no la skill— impone que el unico camino al texto sea
+   * `workspace_read_anonymized`: el modelo no puede saltarse la redaccion
+   * leyendo el fichero en crudo ni con una busqueda.
+   */
+  vetoDirectReads?: boolean
+  /**
+   * Si este plugin registra la herramienta `anonymize`. Ausente o `true`: se
+   * registra, que es lo correcto en un perfil que redacta texto que el agente ya
+   * tiene (pegado, dictado o escrito por el). Con `false`, en un perfil donde
+   * TODA lectura llega ya redactada, la herramienta no se publica: no hay texto
+   * en crudo que el agente tenga que anonimizar, y la superficie del turno no
+   * ofrece un camino de redaccion que nadie necesita. El resto del plugin —el
+   * mapa, el seam `privacy` y `workspace_read_anonymized`— no cambia.
+   */
+  exposeAnonymize?: boolean
 }
 
 /**
  * Esquema de configuracion NATIVO de Schemastery, que es el unico que el
  * validador de config del harness reconoce (`packages/boot/app-boot/src/config-schema/collect.ts`:
- * un esquema que no sea Schemastery nativo se marca `unsupported`). Los tres
+ * un esquema que no sea Schemastery nativo se marca `unsupported`). Todos los
  * campos son opcionales; sin ninguno, el plugin usa sus valores por defecto.
  */
 export const Config: z<Config> = z.object({
   mapPath: z.string(),
   mapKeyRef: z.string(),
   ttlDays: z.number(),
+  vetoDirectReads: z.boolean(),
+  exposeAnonymize: z.boolean(),
 })
+
+/** Las herramientas que devuelven el contenido del workspace en crudo. */
+export const DIRECT_READ_TOOLS: readonly string[] = ['read', 'grep', 'glob']
+
+/**
+ * Si una herramienta es una lectura directa que el perfil veta.
+ *
+ * Es una funcion pura para que la politica se pueda probar sin montar el
+ * pipeline: el `apply` la consulta en `tools/pre-execute` con el nombre tal como
+ * llega al evento.
+ *
+ * @param toolName - nombre con el que el modelo invoca la herramienta.
+ * @param vetoDirectReads - si el perfil activo el veto de lecturas directas.
+ * @returns `true` cuando esa llamada NO debe ejecutarse.
+ */
+export function shouldVetoRead(toolName: string, vetoDirectReads: boolean): boolean {
+  return vetoDirectReads && DIRECT_READ_TOOLS.includes(toolName)
+}
 
 /**
  * El fichero del mapa sellado, con carga perezosa y fallo cerrado.
@@ -237,6 +284,12 @@ class SealedMapFile {
       }
       const before = this.map.toJSON()
       const value = operation(this.map)
+      // La purga va DESPUES de la mutacion y ANTES de comparar: lo que acaba de
+      // acuñarse tiene su caducidad en el futuro y sobrevive, y lo que ya caduco
+      // se va del fichero sellado en esta misma escritura. Sin ella el sobre
+      // creceria con cada valor visto y guardaria para siempre justo lo que la
+      // retencion declarada dice que ya no se conserva.
+      this.map.purge()
       const after = this.map.toJSON()
       if (after === before) return { value, changed: false }
       // El reemplazo es atomico y el fallo de escritura NO se tapa: sube tal
@@ -391,6 +444,8 @@ export function apply(ctx: Context, config: Config = {}): void {
   if (ttlDays !== undefined && (!Number.isFinite(ttlDays) || ttlDays <= 0)) {
     throw new Error('privacy-helmcode: ttlDays must be a positive number of days')
   }
+  const vetoDirectReads = config.vetoDirectReads === true
+  const exposeAnonymize = config.exposeAnonymize !== false
   const store = new SealedMapFile(ctx, mapPath, mapKeyRef)
 
   // El seam se provee con el plugin y comparte el MISMO mapa y la MISMA
@@ -402,44 +457,70 @@ export function apply(ctx: Context, config: Config = {}): void {
     redact: async (text: string) => (await redactThrough(store, text, ttlDays)).text,
   })
 
-  ctx.tools.register(defineTool({
-    name: 'anonymize',
-    description:
-      'Replace Spanish personal data (DNI/NIE, IBAN, card, social-security number, phone, email, '
-      + 'plate, health-record number) in the given text with stable placeholders and return the redacted text. '
-      + 'The same value always yields the same placeholder, because the map persists across sessions under the '
-      + "profile's home, encrypted with a key from the credential store. The ORIGINAL text stays in the local "
-      + 'session log: only the redacted text is dispatched to the model, and the placeholders can be restored '
-      + 'only by an operator holding the sealed map and its key. If the map cannot be read or decrypted, this '
-      + 'tool fails instead of returning unredacted text.',
-    parameters: {
-      text: {
-        type: 'string',
-        required: true,
-        description: 'Text to redact. Spanish PII is replaced by placeholders such as [DNI_1]; anything else is returned unchanged.',
+  // 0. El VETO de lecturas directas. Es una decision del HOST: la skill del pack
+  //    puede pedir "nunca uses `read`", pero una instruccion no impide que el
+  //    modelo la ignore, y el error de tamano de una lectura tampoco. Con el veto
+  //    activo, `read`, `grep` y `glob` no llegan a ejecutarse y el unico camino
+  //    para ver el contenido de un fichero es `workspace_read_anonymized`, que
+  //    redacta ANTES de devolverlo. La variante `deny` de `PreToolDecision` es
+  //    la misma que usa la guardia de egreso: `reason` es el texto que ve el
+  //    modelo e `info` la identidad estructurada del fallo.
+  if (vetoDirectReads) {
+    ctx.on('tools/pre-execute', async (exec, next): Promise<PreToolDecision> => {
+      if (!shouldVetoRead(exec.name, true)) return next()
+      return {
+        kind: 'deny',
+        reason:
+          `[DIRECT_READ_VETOED] la herramienta "${exec.name}" devuelve el contenido del workspace sin redactar, y `
+          + 'este perfil anonimiza antes de que el texto llegue al modelo. Usa `workspace_read_anonymized`: lee el '
+          + 'fichero por el seam de ficheros y sustituye los datos personales espanoles por marcadores estables. '
+          + 'Si la lectura anonimizada falla, PARA y dilo: volver a la lectura en crudo es justo lo que este perfil '
+          + 'prohibe.',
+        info: { name: 'DirectReadVetoedError', code: 'DIRECT_READ_VETOED' },
+      }
+    })
+  }
+
+  if (exposeAnonymize) {
+    ctx.tools.register(defineTool({
+      name: 'anonymize',
+      description:
+        'Replace Spanish personal data (DNI/NIE, IBAN, card, social-security number, phone, email, '
+        + 'plate, health-record number) in the given text with stable placeholders and return the redacted text. '
+        + 'The same value always yields the same placeholder, because the map persists across sessions under the '
+        + "profile's home, encrypted with a key from the credential store. The ORIGINAL text stays in the local "
+        + 'session log: only the redacted text is dispatched to the model, and the placeholders can be restored '
+        + 'only by an operator holding the sealed map and its key. If the map cannot be read or decrypted, this '
+        + 'tool fails instead of returning unredacted text.',
+      parameters: {
+        text: {
+          type: 'string',
+          required: true,
+          description: 'Text to redact. Spanish PII is replaced by placeholders such as [DNI_1]; anything else is returned unchanged.',
+        },
       },
-    },
-    output: {
-      schema: { type: 'string' },
-      // Presupuesto de acento (brandbook): este render emite TEXTO PLANO, sin
-      // color ni estilo, asi que no gasta ninguno de los 4-5 momentos indigo
-      // fuertes que una pantalla puede tener. Si un corte futuro pinta aqui los
-      // marcadores ([DNI_1]) o el nombre de la herramienta, van en `accent-text`
-      // o en gris —nunca en el indigo base, que queda para los momentos fuertes,
-      // ni en texto de cuerpo ni en separadores—.
-      render: (_args, value) => [{ type: 'text', text: value }],
-    },
-    async execute(args) {
-      const result = await redactThrough(store, args.text, ttlDays)
-      return renderRedaction('the text argument', result.text, result.findings, result.mapChanged)
-    },
-  }))
+      output: {
+        schema: { type: 'string' },
+        // Presupuesto de acento (brandbook): este render emite TEXTO PLANO, sin
+        // color ni estilo, asi que no gasta ninguno de los 4-5 momentos indigo
+        // fuertes que una pantalla puede tener. Si un corte futuro pinta aqui los
+        // marcadores ([DNI_1]) o el nombre de la herramienta, van en `accent-text`
+        // o en gris —nunca en el indigo base, que queda para los momentos fuertes,
+        // ni en texto de cuerpo ni en separadores—.
+        render: (_args, value) => [{ type: 'text', text: value }],
+      },
+      async execute(args) {
+        const result = await redactThrough(store, args.text, ttlDays)
+        return renderRedaction('the text argument', result.text, result.findings, result.mapChanged)
+      },
+    }))
+  }
 
   ctx.tools.register(defineTool({
     name: 'workspace_read_anonymized',
     description:
-      'Read a UTF-8 text file and return its content with Spanish personal data replaced by the same stable '
-      + 'placeholders `anonymize` uses. The file is read through the filesystem seam, so the workspace rules of '
+      'Read a UTF-8 text file and return its content with Spanish personal data replaced by the stable '
+      + 'map. The file is read through the filesystem seam, so the workspace rules of '
       + 'this composition govern the path, and the file itself is never modified. The ORIGINAL content stays on '
       + 'disk and in the local session log: only the redacted text is dispatched to the model, and restoring the '
       + 'values is a manual operation with the sealed map and its key. If the map cannot be read or decrypted, '
@@ -514,6 +595,10 @@ interface ReadAnonymizedArgs {
  * El fallo por tamano: se nombra el fichero, lo que mide y el limite, y se dice
  * por que no se trunca.
  *
+ * El mensaje NO manda al modelo a una lectura en crudo: en un perfil que
+ * anonimiza, `read` esta vetado en `tools/pre-execute`, asi que la salida util
+ * es subir el limite de ESTA llamada.
+ *
  * @param displayPath - ruta tal como la presenta el backend.
  * @param bytes - el tamano observado.
  * @param maxBytes - el limite de esta llamada.
@@ -521,6 +606,7 @@ interface ReadAnonymizedArgs {
 function tooLarge(displayPath: string, bytes: number, maxBytes: number): Error {
   return new Error(
     `privacy-helmcode: refusing to read "${displayPath}": ${String(bytes)} bytes exceed the ${String(maxBytes)}-byte cap, `
-    + 'and truncating could cut a value in half; pass a larger maxBytes or read the file with the read tool',
+    + 'and truncating could cut a value in half; pass a larger maxBytes and retry, or read the document in parts, '
+    + 'because a raw read is exactly what this profile does not allow',
   )
 }

@@ -29,13 +29,21 @@ export type QuotaBucket = 'unlimited' | 'sota' | 'addon'
 export const HELMCODE_PROVIDER = 'helmcode'
 
 /**
+ * Las rutas de proveedor cuyo consumo pertenece a la cuota de Helmcode.
+ *
+ * El dueño confirmo que su suscripcion de NaN Builders ES su suscripcion de
+ * Helmcode, asi que las dos puertas por las que se sirven los mismos modelos
+ * descuentan de la misma cuota y no de dos.
+ */
+const HELMCODE_PROVIDERS: readonly string[] = ['helmcode', 'nan-builders']
+
+/**
  * La ruta que sirve los MISMOS modelos por otra puerta (en esta maquina, NaN).
  *
- * Su consumo no es cuota de Helmcode y por eso `bucketOf` sigue devolviendo
- * `undefined` para ella: no hay plan al que imputarlo. El medidor la cuenta
- * aparte, en el cubo `nan`, para que el operador vea las dos cosas sin
- * mezclarlas. NaN no publica tabla de limites, asi que ese cubo no tiene tope:
- * solo consumo.
+ * El dueño confirmo que NaN Builders es su suscripcion de Helmcode, asi que su
+ * consumo SI es cuota de Helmcode: `bucketOf` lo imputa al mismo cubo que la
+ * ruta `helmcode`. NaN no publica tabla de limites propia, de modo que los
+ * topes que se le aplican son los del plan de Helmcode.
  */
 export const NAN_PROVIDER = 'nan-builders'
 
@@ -132,18 +140,18 @@ export const KEY_LIMITS: KeyLimits = Object.freeze({
  *
  * La atribucion es por RUTA, no por identificador de modelo, y ese detalle es el
  * que evita un error caro: el mismo despliegue puede servir `deepseek-v4-flash`
- * o `glm5.3-flash` por otra ruta (en esta maquina, la ruta NaN los sirve), y
- * contarlos como cuota de Helmcode seria imputar a un plan un consumo que no es
- * suyo. Cualquier proveedor que no sea Helmcode devuelve `undefined`: no hay
- * cuota de Helmcode que descontar. La ruta NaN tiene su cubo aparte en la vista
- * (ver {@link NAN_PROVIDER}), que es del medidor y no de esta tabla.
+ * o `glm5.3-flash` por otra ruta (en esta maquina, la ruta NaN los sirve), y el
+ * dueño confirmo que esa otra ruta es su suscripcion de Helmcode, asi que su
+ * consumo cuenta en la MISMA cuota y por eso se imputa al mismo cubo. Cualquier
+ * proveedor que no sea Helmcode devuelve `undefined`: no hay cuota de Helmcode
+ * que descontar.
  *
  * @param provider - la ruta de proveedor que sirvio la llamada.
  * @param model - el identificador exacto del modelo.
  * @returns el cubo, o `undefined` cuando la llamada no pertenece a Helmcode.
  */
 export function bucketOf(provider: string, model: string): QuotaBucket | undefined {
-  if (provider !== HELMCODE_PROVIDER) return undefined
+  if (!HELMCODE_PROVIDERS.includes(provider)) return undefined
   if (ADDON_MODELS.includes(model)) return 'addon'
   if (SOTA_MODELS.includes(model)) return 'sota'
   if (UNLIMITED_MODELS.includes(model)) return 'unlimited'

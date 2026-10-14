@@ -19,13 +19,13 @@ import {
 } from '../src/limits.ts'
 
 describe('atribucion por ruta', () => {
-  it('no imputa a Helmcode el consumo de otra ruta que sirve los mismos modelos', () => {
-    // El caso real: la ruta NaN de esta maquina sirve deepseek-v4-flash,
-    // glm5.3-flash, qwen3.6 y gemma4. Contarlos como cuota de Helmcode seria
-    // imputar a un plan un consumo que no es suyo.
-    expect(bucketOf('nan-builders', 'deepseek-v4-flash')).toBeUndefined()
-    expect(bucketOf('nan-builders', 'glm5.3-flash')).toBeUndefined()
-    expect(bucketOf('nan-builders', 'qwen3.6')).toBeUndefined()
+  it('imputa a Helmcode el consumo de la otra ruta que sirve los mismos modelos', () => {
+    // El caso real: la ruta NaN de esta maquina es la suscripcion de Helmcode del
+    // dueño, asi que sirve deepseek-v4-flash, glm5.3-flash, qwen3.6 y gemma4 por
+    // la misma cuota y cada modelo cae en su mismo cubo.
+    expect(bucketOf('nan-builders', 'deepseek-v4-flash')).toBe('sota')
+    expect(bucketOf('nan-builders', 'glm5.3-flash')).toBe('sota')
+    expect(bucketOf('nan-builders', 'qwen3.6')).toBe('unlimited')
     expect(bucketOf('openai', 'gpt-6-astra')).toBeUndefined()
   })
 
@@ -161,9 +161,16 @@ describe('degradacion sugerida', () => {
     expect(suggestDegradation('starter', HELMCODE_PROVIDER, 'qwen3.6', 999_999_999_999)).toBeUndefined()
   })
 
-  it('no propone cambiar a un modelo por otra ruta', () => {
+  it('propone cambiar de modelo tambien por la ruta NaN, que es la misma cuota', () => {
+    // La otra puerta de la suscripcion de Helmcode descuenta del mismo cubo, de
+    // modo que agotarlo alli pide la misma degradacion que agotarlo en `helmcode`.
+    expect(suggestDegradation('starter', 'nan-builders', 'deepseek-v4-flash', 5_000_000_000))
+      .toBe(DEFAULT_DEGRADATION_TARGET)
+  })
+
+  it('no propone cambiar a un modelo por una ruta que no es de Helmcode', () => {
     // Sin ruta Helmcode no hay cuota de Helmcode que agotar.
-    expect(suggestDegradation('starter', 'nan-builders', 'deepseek-v4-flash', 999_999_999_999)).toBeUndefined()
+    expect(suggestDegradation('starter', 'openai', 'deepseek-v4-flash', 999_999_999_999)).toBeUndefined()
   })
 
   it('no degrada al mismo modelo que ya se pedia', () => {

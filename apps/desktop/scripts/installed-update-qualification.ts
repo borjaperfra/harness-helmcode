@@ -3,6 +3,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { gt, valid } from 'semver'
+import { requireTestHttpOrigin } from './installed-update-origin.ts'
 
 /** Source identifiers exclude file contents, configuration values, and credentials. */
 export interface InstalledUpdateSource {
@@ -30,13 +31,17 @@ export interface InstalledUpdateRun {
 
 /**
  * Allocate a new local run and retain its manifest without reading release credentials.
+ * The destination is the origin the deployment declares (`DOWNLOAD_TEST_ORIGIN`, validated);
+ * this repository carries no built-in test host.
  * @param parent Ignored material directory; each invocation acquires a separate child atomically.
  * @param versions Explicit original and successor test versions, in increasing order.
  * @param source Source version, Git commit, and dirty-file list captured before material preparation.
+ * @param origin Public origin of the test feed; defaults to the declared `DOWNLOAD_TEST_ORIGIN`.
  * @returns The retained run manifest; no package or publication is implied by its presence.
  */
 export async function createInstalledUpdateRun(
   parent: string, versions: readonly [string, string], source: InstalledUpdateSource,
+  origin: string = requireTestHttpOrigin(process.env.DOWNLOAD_TEST_ORIGIN),
 ): Promise<InstalledUpdateRun> {
   validateVersions(versions)
   if (valid(source.version) === null || !/^[a-f0-9]{40,64}$/u.test(source.commit)) {
@@ -48,7 +53,7 @@ export async function createInstalledUpdateRun(
   const run: InstalledUpdateRun = {
     schemaVersion: 1, id, root, createdAt: new Date().toISOString(), source, versions,
     appId: `com.deepseek.dsh.qualification.q${id}`, productName: `DSH Update Test ${id}`,
-    environment: 'test', origin: 'https://download-test.deepseek.com', bucket: 'bj-toc-download-test-1320056602',
+    environment: 'test', origin, bucket: 'bj-toc-download-test-1320056602',
     feedKey: `dsh-desk/feeds/qualification/${id}/win-x64/nightly.yml`,
     binPrefix: `dsh-desk/bin/qualification/${id}/win-x64`,
   }
@@ -71,11 +76,12 @@ function validateVersions(versions: readonly [string, string]): void {
  */
 export async function readInstalledUpdateRun(path: string): Promise<InstalledUpdateRun> {
   const value: unknown = JSON.parse(await readFile(path, 'utf8'))
+  const origin = requireTestHttpOrigin(process.env.DOWNLOAD_TEST_ORIGIN)
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('installed update: invalid run manifest')
   const row = value as Record<string, unknown>
   if (row.schemaVersion !== 1 || typeof row.id !== 'string' || !/^[a-f0-9]{24}$/u.test(row.id)
     || row.root !== resolve(dirname(path)) || row.environment !== 'test'
-    || row.origin !== 'https://download-test.deepseek.com' || row.bucket !== 'bj-toc-download-test-1320056602'
+    || row.origin !== origin || row.bucket !== 'bj-toc-download-test-1320056602'
     || row.appId !== `com.deepseek.dsh.qualification.q${row.id}` || row.productName !== `DSH Update Test ${row.id}`
     || row.feedKey !== `dsh-desk/feeds/qualification/${row.id}/win-x64/nightly.yml`
     || row.binPrefix !== `dsh-desk/bin/qualification/${row.id}/win-x64`

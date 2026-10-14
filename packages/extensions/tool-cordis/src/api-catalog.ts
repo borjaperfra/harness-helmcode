@@ -1626,9 +1626,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     methods: [
       {
         signature: '@Remote async fastest(): Promise<string | null>',
-        description: 'Race npm and npmmirror HTTPS ping responses through the Host\'s fetch proxy. Concurrent readers share a probe; a winner cancels and awaits the other request.',
+        description: 'Answer which public registry the dialog should prefer.\n\nThe Host does NOT ping `registry.npmjs.org` or `registry.npmmirror.com`: the install dialog asks the package manager for its own registry, and a Helmcode host has no business opening a socket to a third party\'s registry just to time it. The switch, the deadline and the cache policy stay in the row\'s schema because they are the service\'s declared contract —a profile that configures them keeps validating— and the answer is now always "none".',
         parameters: [],
-        returns: 'the first registry with a successful response, or null when disabled or neither responds successfully; results are cached.',
+        returns: 'null: no external registry is probed, so the dialog keeps the registry pnpm names.',
         throws: ['rejects when the service has been unloaded.'],
       },
     ],

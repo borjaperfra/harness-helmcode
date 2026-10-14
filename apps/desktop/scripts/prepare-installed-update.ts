@@ -3,6 +3,8 @@ import { execFileSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { collectInstalledUpdateJournals, createInstalledUpdateRun, inspectInstalledUpdateJournals } from './installed-update-qualification.ts'
+import { loadDesktopPackageEnvironment } from './desktop-package-environment.mjs'
+import { requireTestHttpOrigin } from './installed-update-origin.ts'
 import { prepareInstalledUpdateBootstrap } from './prepare-installed-update-bootstrap.ts'
 import { prepareInstalledUpdateRuntime } from './prepare-installed-update-runtime.ts'
 import { planInstalledUpdateDistribution } from './installed-update-distribution.ts'
@@ -45,10 +47,14 @@ async function main(): Promise<void> {
   }
   const metadata = JSON.parse(await readFile(resolve(repository, 'package.json'), 'utf8')) as { version: string }
   const git = (args: string[]): string => execFileSync('git', args, { cwd: repository, encoding: 'utf8', windowsHide: true }).trim()
+  // El origen del feed de prueba lo declara el despliegue en `.env.windows`; se
+  // lee AQUI, en la rama que lo necesita, para que `collect` e `inspect` sigan
+  // funcionando sin ese fichero.
+  const origin = requireTestHttpOrigin(loadDesktopPackageEnvironment('win32').DOWNLOAD_TEST_ORIGIN)
   const run = await createInstalledUpdateRun(resolve(repository, 'apps/desktop/.desktop-build/qualification'), [original, successor], {
     version: metadata.version, commit: git(['rev-parse', 'HEAD']),
     dirtyFiles: git(['status', '--porcelain=v1', '--untracked-files=normal']).split('\n').filter(Boolean),
-  })
+  }, origin)
   console.log(JSON.stringify({ manifest: resolve(run.root, 'run.json'), appId: run.appId,
     versions: run.versions, feedUrl: `${run.origin}/${run.feedKey}`, artifactsPrepared: false, published: false }, null, 2))
 }

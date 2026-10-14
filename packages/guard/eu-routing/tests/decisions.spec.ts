@@ -2,15 +2,19 @@ import { describe, expect, it } from 'vitest'
 
 import {
   decideModelRoute,
+  decideRouteEndpoint,
   decideTool,
   declaredResidency,
+  expectedBaseURL,
   routeKey,
   type EgressToolTable,
+  type ResidencyEndpointTable,
   type ResidencyMode,
   type ResidencyTable,
 } from '../src/decisions.ts'
 import {
   DEFAULT_EGRESS_TOOLS,
+  DEFAULT_RESIDENCY_ENDPOINTS,
   DEFAULT_RESIDENCY_TABLE,
   HELMCODE_PROVIDER,
 } from '../src/defaults.ts'
@@ -200,20 +204,31 @@ describe('decideTool', () => {
     }
   })
 
-  it('no veta la delegacion en proceso, que si pasa por el waterfall', () => {
-    // `subagent` y `subagent_fork` usan drivers en proceso que heredan la ruta
-    // del padre: su trafico de modelo lo cubre decideModelRoute, no esta tabla.
-    expect(decideTool('eu-only', DEFAULT_EGRESS_TOOLS, 'subagent')).toEqual({ kind: 'allow' })
-    expect(decideTool('eu-only', DEFAULT_EGRESS_TOOLS, 'subagent_fork')).toEqual({ kind: 'allow' })
+  it('veta los subagentes genericos: la herramienta no promete heredar la ruta del padre', () => {
+    // `subagent` y `subagent_fork` pueden montar un driver en proceso que hereda
+    // la ruta del padre —y entonces su trafico si pasa por `llm/stream`—, pero la
+    // herramienta admite proveedor y modelo propios para el hijo. La tabla es una
+    // lista blanca de CANALES: lo que no puede afirmarse no se deja pasar.
+    expect(decideTool('eu-only', DEFAULT_EGRESS_TOOLS, 'subagent')).toMatchObject({ kind: 'deny', code: 'EGRESS_TOOL_DENIED' })
+    expect(decideTool('eu-only', DEFAULT_EGRESS_TOOLS, 'subagent_fork')).toMatchObject({ kind: 'deny', code: 'EGRESS_TOOL_DENIED' })
   })
 
-  it('veta las cuatro herramientas con egreso propio de los defaults', () => {
-    for (const tool of ['subagent_codex', 'subagent_claude_code', 'web_fetch', 'web_search']) {
+  it('veta las herramientas con egreso propio de los defaults, cada una con su razon', () => {
+    for (const tool of [
+      'subagent_codex', 'subagent_claude_code', 'web_fetch', 'web_search',
+      'bash', 'pwsh', 'plugin_manager', 'index_workspace', 'index_url',
+    ]) {
       const verdict = decideTool('eu-only', DEFAULT_EGRESS_TOOLS, tool)
       expect(verdict.kind, tool).toBe('deny')
       if (verdict.kind !== 'deny') continue
       expect(verdict.code, tool).toBe('EGRESS_TOOL_DENIED')
       expect(verdict.reason, tool).toContain(tool)
+    }
+  })
+
+  it('veta la familia del PTY por prefijo, porque no hay una herramienta llamada `terminal`', () => {
+    for (const tool of ['terminal_open', 'terminal_send', 'terminal_read', 'terminal_signal', 'terminal_close', 'terminal_list']) {
+      expect(decideTool('eu-only', DEFAULT_EGRESS_TOOLS, tool).kind, tool).toBe('deny')
     }
   })
 
@@ -231,6 +246,66 @@ describe('decideTool', () => {
   it('no confunde el prefijo mcp__ con un nombre que solo lo contiene', () => {
     expect(decideTool('eu-only', DEFAULT_EGRESS_TOOLS, 'read_mcp__file')).toEqual({ kind: 'allow' })
     expect(decideTool('eu-only', DEFAULT_EGRESS_TOOLS, 'mcp')).toEqual({ kind: 'allow' })
+  })
+
+  it('no veta una herramienta que no abre canal propio, ni en eu-only', () => {
+    expect(decideTool('eu-only', DEFAULT_EGRESS_TOOLS, 'knowledge_search')).toEqual({ kind: 'allow' })
+    expect(decideTool('eu-only', DEFAULT_EGRESS_TOOLS, 'todo_write')).toEqual({ kind: 'allow' })
+  })
+})
+
+describe('decideRouteEndpoint: la residencia se comprueba en la URL resuelta', () => {
+  /** La expectativa del test: el proveedor europeo del bundle. */
+  const ENDPOINTS: ResidencyEndpointTable = DEFAULT_RESIDENCY_ENDPOINTS
+
+  it('declara el endpoint europeo del proveedor del bundle', () => {
+    expect(expectedBaseURL(ENDPOINTS, HELMCODE_PROVIDER)).toBe('https://api.helmcode.com/v1')
+    expect(expectedBaseURL(ENDPOINTS, 'ajeno')).toBeUndefined()
+    expect(expectedBaseURL({ helmcode: '' }, HELMCODE_PROVIDER)).toBeUndefined()
+  })
+
+  it('deja pasar la ruta cuya URL resuelta es la esperada, con o sin barra final', () => {
+    for (const baseURL of ['https://api.helmcode.com/v1', 'https://api.helmcode.com/v1/', ' HTTPS://API.HELMCODE.COM/v1 ']) {
+      expect(decideRouteEndpoint('eu-only', ENDPOINTS, HELMCODE_PROVIDER, 'qwen3.6', baseURL), baseURL).toEqual({ kind: 'allow' })
+    }
+  })
+
+  it('veta con RESIDENCY_REFUSED y nombra el host real cuando el baseURL cambia', () => {
+    const verdict = decideRouteEndpoint('eu-only', ENDPOINTS, HELMCODE_PROVIDER, 'qwen3.6', 'https://gateway.acme.example/v1')
+
+    expect(verdict.kind).toBe('deny')
+    if (verdict.kind !== 'deny') return
+    expect(verdict.code).toBe('RESIDENCY_REFUSED')
+    // La razon dice A DONDE iba la peticion, no solo que se nego.
+    expect(verdict.reason).toContain('gateway.acme.example')
+    expect(verdict.reason).toContain('helmcode/qwen3.6')
+  })
+
+  it('veta tambien cuando solo cambia la ruta del mismo host', () => {
+    const verdict = decideRouteEndpoint('eu-only', ENDPOINTS, HELMCODE_PROVIDER, 'gemma4', 'https://api.helmcode.com/otra')
+    expect(verdict.kind).toBe('deny')
+  })
+
+  it('veta en `ask` igual que en `eu-only`, y no en `open`', () => {
+    expect(decideRouteEndpoint('ask', ENDPOINTS, HELMCODE_PROVIDER, 'qwen3.6', 'https://otro.example/v1').kind).toBe('deny')
+    expect(decideRouteEndpoint('open', ENDPOINTS, HELMCODE_PROVIDER, 'qwen3.6', 'https://otro.example/v1')).toEqual({ kind: 'allow' })
+  })
+
+  it('sin URL observable no veta: la guardia no se inventa un host', () => {
+    expect(decideRouteEndpoint('eu-only', ENDPOINTS, HELMCODE_PROVIDER, 'qwen3.6', undefined)).toEqual({ kind: 'allow' })
+    expect(decideRouteEndpoint('eu-only', ENDPOINTS, HELMCODE_PROVIDER, 'qwen3.6', '')).toEqual({ kind: 'allow' })
+  })
+
+  it('sin expectativa declarada para el proveedor no hay nada que exigir', () => {
+    expect(decideRouteEndpoint('eu-only', ENDPOINTS, 'ajeno', 'modelo', 'https://otro.example/v1')).toEqual({ kind: 'allow' })
+  })
+
+  it('compara tambien una URL que no parsea, sin inventarse un host', () => {
+    const verdict = decideRouteEndpoint('eu-only', { ajeno: 'no-es-una-url' }, 'ajeno', 'modelo', 'tampoco')
+    expect(verdict.kind).toBe('deny')
+    if (verdict.kind !== 'deny') return
+    expect(verdict.reason).toContain('tampoco')
+    expect(decideRouteEndpoint('eu-only', { ajeno: 'no-es-una-url' }, 'ajeno', 'modelo', 'no-es-una-url')).toEqual({ kind: 'allow' })
   })
 })
 

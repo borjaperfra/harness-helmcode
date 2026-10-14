@@ -288,6 +288,30 @@ export class RedactionMap {
   }
 
   /**
+   * Borra del mapa las entradas que ya caducaron.
+   *
+   * `resolve` NIEGA una entrada caducada, pero negarla no la borra: sin esta
+   * purga el fichero sellado creceria con cada valor visto y conservaria para
+   * siempre justo lo que la postura de retencion dice que ya no se guarda. Los
+   * CONTADORES no se reinician, asi que el indice de un tipo sigue donde iba y un
+   * marcador ya emitido no se reutiliza para otro valor.
+   *
+   * @param now - el instante contra el que se comprueba la caducidad.
+   * @returns cuantas entradas se borraron.
+   */
+  purge(now: Date = new Date()): number {
+    let removed = 0
+    for (const [value, entry] of this.byValue) {
+      const expiresAt = entry.expiresAt
+      if (expiresAt === undefined || Date.parse(expiresAt) > now.getTime()) continue
+      this.byValue.delete(value)
+      this.byPlaceholder.delete(entry.placeholder)
+      removed += 1
+    }
+    return removed
+  }
+
+  /**
    * Serializa el mapa a JSON estable: entradas ordenadas por marcador y claves
    * siempre en el mismo orden, para que el fichero persistido sea reproducible.
    *

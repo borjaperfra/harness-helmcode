@@ -46,4 +46,18 @@
     # claro, y una clave en el seria una clave publicada—: vive en el credential
     # store bajo `PRIVACY_MAP_KEY`. Sin esa credencial las dos herramientas
     # fallan en vez de devolver texto sin redactar.
+    #
+    # `vetoDirectReads: true` es la segunda mitad de la politica, y la impone el
+    # HOST, no la skill: `read`, `grep` y `glob` se vetan en
+    # `tools/pre-execute`, de modo que el unico camino al contenido de un
+    # fichero es `workspace_read_anonymized`, que redacta antes de devolverlo.
+    # Una instruccion de la skill pide ese flujo; este veto lo garantiza.
+    #
+    # `exposeAnonymize: false` retira la herramienta `anonymize` de este perfil.
+    # Aqui TODA lectura llega ya redactada, asi que no hay texto en crudo que el
+    # agente tenga que anonimizar, y la superficie del turno no ofrece un camino
+    # de redaccion que nadie necesita. El mapa, el seam `privacy` y
+    # `workspace_read_anonymized` no cambian.
     ttlDays: 7
+    vetoDirectReads: true
+    exposeAnonymize: false

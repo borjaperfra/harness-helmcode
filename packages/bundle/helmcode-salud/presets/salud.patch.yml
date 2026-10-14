@@ -6,7 +6,9 @@
 #
 # LAS CAPACIDADES DE PRIVACIDAD Y RECUPERACION ESTAN DENTRO, y no se declaran
 # aqui: sus filas las monta este mismo bundle en la composicion del perfil
-# (`privacy-helmcode` publica `anonymize` y `workspace_read_anonymized`;
+# (`privacy-helmcode` publica `workspace_read_anonymized` —y, en el resto de los
+# perfiles, tambien `anonymize`: la fila de ESTE pack lo desactiva con
+# `exposeAnonymize: false`, porque aqui toda lectura llega ya redactada—;
 # `retrieval-helmcode` publica `knowledge_search` e `index_workspace`), y una
 # herramienta registrada en la capa global es visible para toda sesion, incluida
 # la de este preset. Volver a montar esos dos plugins dentro del preset crearia
@@ -14,11 +16,19 @@
 # lo que el preset decide es que herramientas ADICIONALES del turno se montan, y
 # recortar es no montarlas.
 #
+# EL CORTE DE LECTURA LO GARANTIZA EL HOST, no esta lista de herramientas: el
+# pack monta `privacy-helmcode` con `vetoDirectReads: true`, asi que `read`,
+# `grep` y `glob` se vetan en `tools/pre-execute` y no hay forma de que el modelo
+# vea el contenido de un fichero sin pasar por `workspace_read_anonymized`. La
+# lista de abajo decide que plugins se montan en el turno; el veto decide que
+# llamadas se ejecutan, y una instruccion de skill no basta para lo segundo.
+#
 # RECORTE respecto de la lista de `standard`, con el motivo de cada uno:
 #
 #   - `tool-bash` y `tool-pwsh`: ejecutar ordenes no forma parte del trabajo con
 #     documentacion clinica, y abren un segundo camino a los bytes de un fichero
-#     que el flujo obligatorio de anonimizacion no gobierna.
+#     que el flujo obligatorio de anonimizacion no gobierna. La guardia de egreso
+#     tambien los veta en `eu-only` (`DEFAULT_EGRESS_TOOLS`), por la misma razon.
 #   - `tool-jobs`: trabajos en segundo plano existen para ordenes largas; aqui no
 #     hay ninguna.
 #   - `command-goal`, `tool-goal` y el grupo `planning` (`plan-mode`):
@@ -39,8 +49,11 @@
 #     capacidad clinica.
 #
 # LO QUE SE CONSERVA: `persona` (con el encuadre del sector), `agent-instructions`
-# (las instrucciones del proyecto siguen contando), `tool-fs` y `tool-fs-search`
-# (leer el workspace con busqueda; escribir el resumen), la instancia propia de
+# (las instrucciones del proyecto siguen contando), `tool-fs` (escribir el resumen
+# y editar; sus lecturas —`read`— las veta el host) y `tool-fs-search` (buscar en
+# el workspace: `grep` y `glob` tambien quedan vetados, asi que la busqueda de
+# CONTENIDO se hace con `knowledge_search` sobre el indice, que ya devuelve los
+# fragmentos redactados), la instancia propia de
 # `skill-filesystem` con las dos skills del pack, `tool-skill` (invocarlas), el
 # grupo `compaction` (un historial clinico largo se compacta sin perder el
 # hilo), `tool-ask-user` (preguntar antes de suponer), `tool-todo` y `present`

@@ -594,6 +594,51 @@ describe('knowledge_search', () => {
     expect(huge.isError).toBe(true)
     expect(textOf(huge)).toContain('topN must be a positive integer')
   })
+
+  /** Los dos valores que el doble del mapa sabe marcar. */
+  const MARKED_DNI = '12345678Z'
+  const MARKED_TEL = '612345678'
+
+  it('con el mapa de privacidad montado devuelve los fragmentos YA redactados', async () => {
+    const h = await harness({ key: KEY, sources: { ficha: 'ficha.md' } })
+    writeSource(h.workspace, 'ficha.md', `Titular con DNI ${MARKED_DNI} y movil ${MARKED_TEL}.`)
+    expect((await call(h, 'index_workspace', {}, true)).isError).toBe(false)
+    const redacted: string[] = []
+    h.ctx.provide('privacy', {
+      redact: (text: string) => {
+        redacted.push(text)
+        return Promise.resolve(text.replaceAll(MARKED_DNI, '[DNI_1]').replaceAll(MARKED_TEL, '[TEL_1]'))
+      },
+    })
+
+    const result = await call(h, 'knowledge_search', { query: 'titular' }, true)
+
+    expect(result.isError).toBe(false)
+    // El fragmento sale con marcadores: el resultado de una busqueda no es una
+    // puerta trasera al texto en crudo del documento.
+    expect(textOf(result)).toContain('[DNI_1]')
+    expect(textOf(result)).toContain('[TEL_1]')
+    expect(textOf(result)).not.toContain(MARKED_DNI)
+    expect(textOf(result)).not.toContain(MARKED_TEL)
+    // Se redacta el fragmento, no la consulta ni el informe entero.
+    expect(redacted).toHaveLength(1)
+    expect(redacted[0]).toContain(MARKED_DNI)
+  })
+
+  it('si el mapa no se puede abrir la busqueda FALLA en vez de devolver el fragmento en crudo', async () => {
+    const h = await harness({ key: KEY, sources: { ficha: 'ficha.md' } })
+    writeSource(h.workspace, 'ficha.md', `Titular con DNI ${MARKED_DNI}.`)
+    expect((await call(h, 'index_workspace', {}, true)).isError).toBe(false)
+    h.ctx.provide('privacy', {
+      redact: () => Promise.reject(new Error('privacy-helmcode: cannot decrypt the sealed map')),
+    })
+
+    const result = await call(h, 'knowledge_search', { query: 'titular' }, true)
+
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toContain('cannot decrypt the sealed map')
+    expect(textOf(result)).not.toContain(MARKED_DNI)
+  })
 })
 
 describe('index_url', () => {

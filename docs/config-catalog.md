@@ -517,13 +517,13 @@ export interface Config {
 - `source`: [`packages/client/ui-plugin-manager/src/index.ts:15`](../packages/client/ui-plugin-manager/src/index.ts)
 
 ```ts config-catalog
-/** Registry-probe deadline and process-local cache policy. */
+/** Registry-probe switch and the row's declared timing policy. */
 export interface Config {
-  /** Whether the dialog can compare the public npm registries. */
+  /** Whether the dialog may compare the public npm registries. */
   registryProbeEnabled: boolean
-  /** Deadline for the parallel HTTPS probes, including response cleanup. */
+  /** Declared deadline of the retired parallel probes; kept so existing rows validate. */
   registryProbeTimeoutMs: number
-  /** Lifetime of a winning registry or unavailable result. */
+  /** Declared lifetime of a cached probe result; kept so existing rows validate. */
   registryProbeCacheTtlMs: number
 }
 ```
@@ -1234,6 +1234,13 @@ export interface Config {
   mode?: ResidencyMode
   /** Entradas de residencia que se SUMAN a las de por defecto (misma clave: gana la del perfil). */
   residency?: ResidencyTable
+  /**
+   * URL base esperada por proveedor, que se SUMA a
+   * {@link DEFAULT_RESIDENCY_ENDPOINTS} (misma clave: gana la del perfil). Sirve
+   * para un despliegue cuya ruta europea no es la del bundle; declarar aqui el
+   * endpoint real es lo que hace que la residencia declarada siga siendo cierta.
+   */
+  endpoints?: Record<string, string>
   /**
    * Reglas de egreso que se SUMAN a las de por defecto. `tools` se declara
    * mutable porque es la ENTRADA de configuracion, que es como la valida
@@ -2278,7 +2285,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-privacy-helmcode`
 
 - `inject`: `tools` · `credentials`
-- `source`: [`packages/guard/privacy-helmcode/src/index.ts:92`](../packages/guard/privacy-helmcode/src/index.ts)
+- `source`: [`packages/guard/privacy-helmcode/src/index.ts:99`](../packages/guard/privacy-helmcode/src/index.ts)
 
 ```ts config-catalog
 /** La configuracion del plugin, tal como la declara el perfil. */
@@ -2295,10 +2302,30 @@ export interface Config {
   mapKeyRef?: string
   /**
    * Caducidad, en dias, de las entradas NUEVAS del mapa. Ausente: las entradas
-   * no caducan. Una entrada caducada no se restaura (el mapa lo niega), pero su
-   * marcador sigue en el historial.
+   * no caducan. Una entrada caducada no se restaura (el mapa lo niega) y ademas
+   * se BORRA del fichero sellado en la siguiente mutacion (`RedactionMap.purge`),
+   * que es la postura de retencion real: lo caducado no se conserva.
    */
   ttlDays?: number
+  /**
+   * Veto de las herramientas de lectura DIRECTA del workspace (`read`, `grep`,
+   * `glob`) en `tools/pre-execute`. Ausente o `false`: el perfil no lo pide y no
+   * se registra ningun veto, de modo que las lecturas normales siguen su curso.
+   * Con `true`, el host —no la skill— impone que el unico camino al texto sea
+   * `workspace_read_anonymized`: el modelo no puede saltarse la redaccion
+   * leyendo el fichero en crudo ni con una busqueda.
+   */
+  vetoDirectReads?: boolean
+  /**
+   * Si este plugin registra la herramienta `anonymize`. Ausente o `true`: se
+   * registra, que es lo correcto en un perfil que redacta texto que el agente ya
+   * tiene (pegado, dictado o escrito por el). Con `false`, en un perfil donde
+   * TODA lectura llega ya redactada, la herramienta no se publica: no hay texto
+   * en crudo que el agente tenga que anonimizar, y la superficie del turno no
+   * ofrece un camino de redaccion que nadie necesita. El resto del plugin —el
+   * mapa, el seam `privacy` y `workspace_read_anonymized`— no cambia.
+   */
+  exposeAnonymize?: boolean
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-privacy-helmcode -->
@@ -2439,7 +2466,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-retrieval-helmcode`
 
 - `inject`: `tools` · `credentials`
-- `source`: [`packages/retrieval/helmcode/src/index.ts:100`](../packages/retrieval/helmcode/src/index.ts)
+- `source`: [`packages/retrieval/helmcode/src/index.ts:105`](../packages/retrieval/helmcode/src/index.ts)
 
 ```ts config-catalog
 /** La configuracion del plugin, tal como la declara el perfil. */
@@ -4423,6 +4450,8 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-fs-observation-policy` | — | [`packages/fs/fs-observation-policy/src/index.ts`](../packages/fs/fs-observation-policy/src/index.ts) |
 | `@deepseek-ai/dsh-fs-ssh` | `ssh` · `sandboxPolicy` | [`packages/ssh/fs-ssh/src/index.ts`](../packages/ssh/fs-ssh/src/index.ts) |
 | `@deepseek-ai/dsh-goal-round-driver` | `agents` · `goals` · `sessions` | [`packages/goal/goal-round-driver/src/index.ts`](../packages/goal/goal-round-driver/src/index.ts) |
+| `@deepseek-ai/dsh-helmcode-banca` | — | [`packages/bundle/helmcode-banca/src/index.ts`](../packages/bundle/helmcode-banca/src/index.ts) |
+| `@deepseek-ai/dsh-helmcode-legal` | — | [`packages/bundle/helmcode-legal/src/index.ts`](../packages/bundle/helmcode-legal/src/index.ts) |
 | `@deepseek-ai/dsh-host-directory-picker-auto` | `webServer` · `loader` | [`packages/host/directory-picker-auto/src/index.ts`](../packages/host/directory-picker-auto/src/index.ts) |
 | `@deepseek-ai/dsh-host-directory-picker-native` | — | [`packages/host/directory-picker-native/src/index.ts`](../packages/host/directory-picker-native/src/index.ts) |
 | `@deepseek-ai/dsh-host-plugin-inventory` | `loader` | [`packages/host/plugin-inventory/src/index.ts`](../packages/host/plugin-inventory/src/index.ts) |
