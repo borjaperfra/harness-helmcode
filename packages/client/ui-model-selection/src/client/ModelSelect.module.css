@@ -270,6 +270,26 @@
   white-space: nowrap;
 }
 
+/* La residencia declarada: punto de color + texto corto bajo el nombre del
+   modelo. El texto es tecnico y pequeño, asi que va en el tono de caption —el
+   color lo lleva el punto de estado— y el indigo de acento no se gasta aqui
+   (presupuesto de acento del brandbook). */
+.residency {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: var(--dsw-alias-label-caption);
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.residencyLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .check {
   display: grid;
   place-items: center;

@@ -3177,6 +3177,9 @@ importers:
       '@deepseek-ai/cordis':
         specifier: workspace:~
         version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-client-locale':
+        specifier: workspace:*
+        version: link:../locale
       '@deepseek-ai/dsh-client-ui-renderer':
         specifier: workspace:*
         version: link:../ui-renderer
@@ -4041,6 +4044,9 @@ importers:
       '@deepseek-ai/dsh-client-test-runtime':
         specifier: workspace:*
         version: link:../../test-support/client-runtime
+      '@deepseek-ai/dsh-client-ui-brand-helmcode':
+        specifier: workspace:*
+        version: link:../ui-brand-helmcode
       '@deepseek-ai/dsh-client-ui-commands':
         specifier: workspace:*
         version: link:../ui-commands
@@ -4062,6 +4068,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-slots':
         specifier: workspace:*
         version: link:../ui-slots
+      '@deepseek-ai/dsh-guard-eu-routing':
+        specifier: workspace:*
+        version: link:../../guard/eu-routing
       '@deepseek-ai/dsh-session':
         specifier: workspace:*
         version: link:../../core/session

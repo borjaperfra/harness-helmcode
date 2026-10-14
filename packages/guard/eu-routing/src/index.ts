@@ -8,7 +8,9 @@
  * El nucleo puro vive en `decisions.ts` (sin imports, probado sin montar el
  * harness) y las tablas por defecto en `defaults.ts`; este fichero es el cableado
  * a los dos seams reales, y no decide nada por su cuenta: pregunta al nucleo y
- * obedece.
+ * obedece. Publica ademas la cara de LECTURA de la tabla
+ * (`ctx.guardEuRouting`, ver `residency.ts`), que la interfaz usa para decir
+ * donde corre cada ruta; esa cara no veta nada.
  *
  * @module @deepseek-ai/dsh-guard-eu-routing
  */
@@ -20,9 +22,24 @@ import type { PreToolDecision, ToolErrorInfo } from '@deepseek-ai/dsh-tools'
 import { decideModelRoute, decideTool } from './decisions.ts'
 import type { EgressToolTable, ResidencyMode, ResidencyTable } from './decisions.ts'
 import { DEFAULT_EGRESS_TOOLS, DEFAULT_RESIDENCY_TABLE } from './defaults.ts'
+import { residencyReader } from './residency.ts'
+import type { GuardEuRouting } from './residency.ts'
 
 export * from './decisions.ts'
 export * from './defaults.ts'
+export * from './residency.ts'
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /**
+     * Lectura de residencia de la guardia. Es OPCIONAL porque la guardia no
+     * tiene por que estar montada: sin entrada en el roster, `ctx.get` contesta
+     * `undefined` y la interfaz no pinta etiqueta (fail-soft). Quien necesite
+     * saber si hay guardia pregunta por `ctx.get('guardEuRouting')`.
+     */
+    guardEuRouting?: GuardEuRouting
+  }
+}
 
 /** Nombre del plugin para los diagnosticos del loader. */
 export const name = 'guard-eu-routing'
@@ -102,6 +119,13 @@ export function apply(ctx: Context, config: Config = {}): void {
   const egressTools: EgressToolTable = {
     tools: [...DEFAULT_EGRESS_TOOLS.tools, ...config.egressTools?.tools ?? []],
   }
+
+  // 0. La cara de LECTURA. Se publica sobre la tabla EFECTIVA —los valores por
+  //    defecto mas lo que sume la configuracion del perfil—, que es la misma
+  //    que decide el veto de abajo: asi la etiqueta que pinta la interfaz y el
+  //    veredicto no pueden divergir. No decide nada; el veto sigue en los dos
+  //    waterfalls.
+  ctx.provide('guardEuRouting', residencyReader(residency))
 
   // 1. Egreso por modelo: el waterfall `llm/stream` envuelve TODA llamada de
   //    streaming (`packages/llm/llm/src/index.ts:75`). Su docblock autoriza el

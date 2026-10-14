@@ -11,6 +11,8 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import { createScope } from '@deepseek-ai/dsh-api-session-controller/client'
+import { apply as applyResidencyGuard, inject as residencyGuardInject } from '@deepseek-ai/dsh-guard-eu-routing/client'
+import { en as helmcodeEn, es as helmcodeEs } from '@deepseek-ai/dsh-client-ui-brand-helmcode/src/client/locales.ts'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
@@ -65,7 +67,7 @@ const GROUPS = [{
 }]
 
 /** Boot the plugin over fake faces + a stateful fake host (current moves on selectModel). */
-async function bench(locale: 'es' | 'en' = 'es') {
+async function bench(locale: 'es' | 'en' = 'es', guard = false) {
   const ctx = new Context()
   let defaultSelection: ModelSelection = { provider: 'deepseek-official', model: 'deepseek-v4-flash' }
   let selected = defaultSelection
@@ -134,6 +136,9 @@ async function bench(locale: 'es' | 'en' = 'es') {
   // There is no jsdom `window` in this lane, so browser-language detection
   // never runs. Each bench states the locale its assertions require.
   localeRuntime.setLocale(locale)
+  // La marca es la dueña del vocabulario de la etiqueta de residencia: se
+  // registran sus diccionarios donde lo haria su propio plugin.
+  localeRuntime.register('helmcode', { es: helmcodeEs, en: helmcodeEn })
   ctx.provide('locale', localeRuntime)
   const scopes = new Map<SessionId, Context>()
   const bindings = new Map<SessionId, {
@@ -155,6 +160,9 @@ async function bench(locale: 'es' | 'en' = 'es') {
   })
   const track = vi.fn()
   ctx.provide('productAnalytics', { enabled: true, track } as never)
+  // La guardia de residencia es OPCIONAL en esta composicion: montada, el
+  // asiento etiqueta cada ruta; sin ella no hay etiqueta (fail-soft).
+  if (guard) await ctx.plugin({ inject: residencyGuardInject, apply: applyResidencyGuard }).await()
   const fiber = ctx.plugin({ inject: [...inject], apply })
   await fiber.await()
   await ctx.plugin(function probe() {}).await()
@@ -549,4 +557,56 @@ it.each([false, true])('accepts switches with blank=%s and no refused switch', a
     b.rejectSelection()
     await face.select({ provider: 'deepseek-official', model: 'deepseek-v4-flash' })
   } finally { await scope.fiber.dispose(); await b.ctx.fiber.dispose() }
+})
+
+describe('residencia declarada en el asiento de modelos', () => {
+  it('sin guardia montada no hay etiqueta: la cara contesta undefined (fail-soft)', async () => {
+    const b = await bench('es')
+    b.mint('s1')
+    const face = b.seat().inject!(sid('s1'))
+
+    expect(face.residency).toBeTypeOf('function')
+    expect(face.residency?.('helmcode', 'qwen3.6')).toBeUndefined()
+    expect(face.residency?.('deepseek-official', 'deepseek-v4-flash')).toBeUndefined()
+  })
+
+  it('con la guardia montada etiqueta eu, us y unknown en el vocabulario de la marca', async () => {
+    const b = await bench('es', true)
+    b.mint('s1')
+    const face = b.seat().inject!(sid('s1'))
+
+    // La tabla de la guardia declara la ruta europea y los nueve frontera.
+    expect(face.residency?.('helmcode', 'qwen3.6')).toEqual({ kind: 'eu', label: helmcodeEs['residency.eu'] })
+    expect(face.residency?.('helmcode', 'gemma4')).toEqual({ kind: 'eu', label: helmcodeEs['residency.eu'] })
+    expect(face.residency?.('helmcode', 'gpt-6-astra')).toEqual({ kind: 'us', label: helmcodeEs['residency.us'] })
+    // Las rutas ajenas a la tabla —el proveedor por defecto, la ruta NaN del
+    // usuario— salen 'unknown': default-deny, nunca un permiso implicito.
+    expect(face.residency?.('deepseek-official', 'deepseek-v4-flash'))
+      .toEqual({ kind: 'unknown', label: helmcodeEs['residency.unknown'] })
+    expect(face.residency?.('nan-builders', 'glm5.3'))
+      .toEqual({ kind: 'unknown', label: helmcodeEs['residency.unknown'] })
+  })
+
+  it('la etiqueta sigue el idioma activo sin volver a montar el plugin', async () => {
+    const b = await bench('es', true)
+    b.mint('s1')
+    const face = b.seat().inject!(sid('s1'))
+    expect(face.residency?.('helmcode', 'qwen3.6')?.label).toBe(helmcodeEs['residency.eu'])
+
+    b.ctx.locale.setLocale('en')
+    expect(face.residency?.('helmcode', 'qwen3.6')?.label).toBe(helmcodeEn['residency.eu'])
+    expect(face.residency?.('helmcode', 'gpt-6-astra')?.label).toBe(helmcodeEn['residency.us'])
+  })
+
+  it('la etiqueta no decide nada: el asiento sigue seleccionando la misma ruta', async () => {
+    const b = await bench('es', true)
+    b.mint('s1')
+    const face = b.seat().inject!(sid('s1'))
+    expect(face.residency?.('helmcode', 'gpt-6-astra')?.kind).toBe('us')
+
+    // La guardia etiqueta; vetar (o no) es cosa del host, no de esta superficie.
+    await expect(face.select({ provider: 'helmcode', model: 'gpt-6-astra' }))
+      .resolves.toEqual({ ok: true, value: undefined })
+    expect(b.hostCurrent()).toEqual({ provider: 'helmcode', model: 'gpt-6-astra' })
+  })
 })

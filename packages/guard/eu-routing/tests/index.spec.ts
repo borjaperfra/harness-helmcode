@@ -198,6 +198,49 @@ describe('tools/pre-execute: veto por egreso propio', () => {
   })
 })
 
+describe('ctx.guardEuRouting: la cara de lectura', () => {
+  it('sin guardia montada no hay servicio: quien lo lee pregunta por ctx.get (fail-soft)', async () => {
+    const ctx = await services()
+    expect(ctx.get('guardEuRouting')).toBeUndefined()
+  })
+
+  it('publica la tabla EFECTIVA, la misma que decide el veto', async () => {
+    const ctx = await services()
+    guard.apply(ctx, { mode: 'eu-only', residency: { 'nan-builders/glm5.3': 'eu' } })
+
+    const read = ctx.get('guardEuRouting')
+    expect(read).toBeDefined()
+    expect(read?.residency('helmcode', 'qwen3.6')).toBe('eu')
+    expect(read?.residency('helmcode', 'gpt-6-astra')).toBe('us')
+    // La entrada que suma el perfil se lee por la cara publica...
+    expect(read?.residency('nan-builders', 'glm5.3')).toBe('eu')
+    // ...y lo que la tabla no declara es 'unknown', no un permiso.
+    expect(read?.residency('ajeno', 'lo-que-sea')).toBe('unknown')
+  })
+
+  it('se retira con el plugin: el servicio no sobrevive a su dueno (HMR)', async () => {
+    const ctx = await services()
+    const fiber = ctx.plugin(guard, { mode: 'open' })
+    await fiber.await()
+    expect(ctx.get('guardEuRouting')).toBeDefined()
+
+    await fiber.dispose()
+    expect(ctx.get('guardEuRouting')).toBeUndefined()
+  })
+
+  it('no veta nada: leida la residencia, el waterfall sigue decidiendo', async () => {
+    const ctx = await services()
+    await ctx.plugin(guard, { mode: 'eu-only' })
+    const reached = probe(ctx)
+
+    // La cara de lectura dice 'us' y no corta nada por si misma; el corte lo
+    // hace el waterfall, que es el unico seam por el que pasa la llamada.
+    expect(ctx.get('guardEuRouting')?.residency('helmcode', 'claude-opus-5-5')).toBe('us')
+    expect(() => ctx.llm.stream(request('helmcode', 'claude-opus-5-5'))).toThrow(LlmError)
+    expect(reached()).toBe(false)
+  })
+})
+
 describe('apply(): modo por defecto y tablas del perfil', () => {
   it('sin configuracion el modo por defecto es open, no eu-only', async () => {
     const ctx = await services()

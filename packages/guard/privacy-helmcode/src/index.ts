@@ -376,6 +376,12 @@ export function apply(ctx: Context, config: Config = {}): void {
     },
     output: {
       schema: { type: 'string' },
+      // Presupuesto de acento (brandbook): este render emite TEXTO PLANO, sin
+      // color ni estilo, asi que no gasta ninguno de los 4-5 momentos indigo
+      // fuertes que una pantalla puede tener. Si un corte futuro pinta aqui los
+      // marcadores ([DNI_1]) o el nombre de la herramienta, van en `accent-text`
+      // o en gris —nunca en el indigo base, que queda para los momentos fuertes,
+      // ni en texto de cuerpo ni en separadores—.
       render: (_args, value) => [{ type: 'text', text: value }],
     },
     async execute(args) {
@@ -406,6 +412,10 @@ export function apply(ctx: Context, config: Config = {}): void {
     },
     output: {
       schema: { type: 'string' },
+      // Presupuesto de acento: el informe sale como TEXTO PLANO (cero momentos
+      // indigo). Un corte que lo estilice pinta la ruta leida y el recuento de
+      // marcadores en `accent-text` o en gris: el acento pequeño nunca usa el
+      // indigo base, y el acento no entra en texto de cuerpo ni en separadores.
       render: (_args, value) => [{ type: 'text', text: value }],
     },
     async execute(args: ReadAnonymizedArgs, exec: ToolExecution) {

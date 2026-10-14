@@ -1219,7 +1219,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-guard-eu-routing`
 
 - `inject`: `llm` · `tools`
-- `source`: [`packages/guard/eu-routing/src/index.ts:39`](../packages/guard/eu-routing/src/index.ts)
+- `source`: [`packages/guard/eu-routing/src/index.ts:56`](../packages/guard/eu-routing/src/index.ts)
 
 ```ts config-catalog
 /** La configuracion del plugin, tal como la declara el perfil. */
@@ -4472,6 +4472,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 | `@deepseek-ai/dsh-experimental-webworker-packer` | — | [`packages/experimental/webworker-packer/src/index.ts`](../packages/experimental/webworker-packer/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-webworker-runtime` | — | [`packages/experimental/webworker-runtime/src/index.ts`](../packages/experimental/webworker-runtime/src/index.ts) |
 | `@deepseek-ai/dsh-helmcode` | — | [`packages/bundle/helmcode/src/index.ts`](../packages/bundle/helmcode/src/index.ts) |
+| `@deepseek-ai/dsh-helmcode-salud` | — | [`packages/bundle/helmcode-salud/src/index.ts`](../packages/bundle/helmcode-salud/src/index.ts) |
 | `@deepseek-ai/dsh-home-paths` | — | [`packages/util/home-paths/src/index.ts`](../packages/util/home-paths/src/index.ts) |
 | `@deepseek-ai/dsh-hook-protocol` | — | [`packages/hooks/hook-protocol/src/index.ts`](../packages/hooks/hook-protocol/src/index.ts) |
 | `@deepseek-ai/dsh-http-proxy` | — | [`packages/util/http-proxy/src/index.ts`](../packages/util/http-proxy/src/index.ts) |

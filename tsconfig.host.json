@@ -397,7 +397,7 @@
     { "path": "./packages/spill/spill-local" },
     { "path": "./packages/spill/spill-policy" },
     { "path": "./packages/guard/timeout-policy" },
-    { "path": "./packages/guard/eu-routing" },
+    { "path": "./packages/guard/eu-routing/tsconfig.host.json" },
     { "path": "./packages/guard/privacy-helmcode" },
     { "path": "./packages/retrieval/helmcode" },
     { "path": "./packages/runtime-diagnostics/invariants" },

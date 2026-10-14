@@ -136,7 +136,32 @@ function allow(): EgressDecision {
 }
 
 /**
+ * La residencia DECLARADA de una ruta, con la lectura default-deny de la tabla.
+ *
+ * Es la unica consulta a la tabla, compartida por la decision
+ * ({@link decideModelRoute}) y por la cara de lectura que consume la interfaz
+ * (`ctx.guardEuRouting`), de modo que la etiqueta que ve un humano y el veto no
+ * puedan divergir. Un valor fuera de la tabla —o un valor que la tabla declare
+ * pero no sea `'eu'` ni `'us'`, cosa que un fichero de perfil puede escribir—
+ * se lee `'unknown'`, nunca como permiso.
+ *
+ * @param table - lista blanca de residencia por `provider/model`.
+ * @param provider - Proveedor de la ruta, tal como lo registra el harness.
+ * @param model - Id del modelo dentro de ese proveedor.
+ * @returns la residencia declarada, o `'unknown'` cuando no hay entrada utilizable.
+ */
+export function declaredResidency(table: ResidencyTable, provider: string, model: string): Residency {
+  const value = table[routeKey(provider, model)]
+  return value === 'eu' || value === 'us' ? value : 'unknown'
+}
+
+/**
  * Decide si una ruta de modelo puede usarse en el modo dado.
+ *
+ * El `reason` del veto es TEXTO PLANO, como los renders de nuestras
+ * herramientas: la superficie que lo muestre decide el color, y un nombre de
+ * herramienta o una ruta tecnica irian alli en `accent-text` o en gris, nunca en
+ * el indigo base (presupuesto de acento del brandbook).
  *
  * @param mode - Modo de la guardia.
  * @param table - Lista blanca de residencia por `provider/model`.
@@ -156,7 +181,7 @@ export function decideModelRoute(
   const route = routeKey(provider, model)
   // Default-deny en una linea: lo que no esta declarado es 'unknown', y
   // 'unknown' no es 'eu'. No se consulta ninguna lista negra.
-  const residency = table[route] ?? 'unknown'
+  const residency = declaredResidency(table, provider, model)
 
   if (mode === 'ask') {
     // `ask` deja pasar la ruta europea: no hay egreso que consentir. Todo lo
@@ -196,7 +221,9 @@ export function decideModelRoute(
  * Decide si una herramienta puede ejecutarse en el modo dado.
  *
  * Solo `eu-only` veta: `ask` y `open` permiten, porque el seam de herramientas ya
- * es fail-closed por si mismo y este nucleo no duplica esa aprobacion.
+ * es fail-closed por si mismo y este nucleo no duplica esa aprobacion. La razon
+ * del veto viaja como texto sin formato, igual que el resto de nuestros informes
+ * tecnicos: no gasta acento por si misma.
  *
  * @param mode - Modo de la guardia.
  * @param egressTools - Herramientas con egreso propio (nombre exacto o prefijo `*`).

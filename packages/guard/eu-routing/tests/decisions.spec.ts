@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   decideModelRoute,
   decideTool,
+  declaredResidency,
   routeKey,
   type EgressToolTable,
   type ResidencyMode,
@@ -237,5 +238,37 @@ describe('routeKey', () => {
   it('construye la clave de la tabla como provider/model', () => {
     expect(routeKey('helmcode', 'qwen3.6')).toBe('helmcode/qwen3.6')
     expect(DEFAULT_RESIDENCY_TABLE[routeKey('helmcode', 'qwen3.6')]).toBe('eu')
+  })
+})
+
+describe('declaredResidency: la unica consulta a la tabla', () => {
+  it('devuelve la residencia declarada de la ruta', () => {
+    expect(declaredResidency(TABLE, 'helmcode', 'modelo-eu')).toBe('eu')
+    expect(declaredResidency(TABLE, 'helmcode', 'modelo-us')).toBe('us')
+    expect(declaredResidency(TABLE, 'helmcode', 'modelo-desconocido')).toBe('unknown')
+  })
+
+  it('lee unknown lo que la tabla no declara, tambien en otro proveedor', () => {
+    expect(declaredResidency(TABLE, 'helmcode', 'no-existe')).toBe('unknown')
+    expect(declaredResidency(TABLE, 'openai', 'gpt-6-astra')).toBe('unknown')
+    expect(declaredResidency({}, 'helmcode', 'qwen3.6')).toBe('unknown')
+  })
+
+  it('lee unknown un valor que la tabla declare fuera de la union', () => {
+    // Un fichero de perfil es texto: puede escribir cualquier cosa. Ningun valor
+    // que no sea exactamente 'eu' o 'us' puede leerse como permiso.
+    const perfil = Object.fromEntries<string>([['helmcode/raro', 'eu ']]) as ResidencyTable
+    expect(declaredResidency(perfil, 'helmcode', 'raro')).toBe('unknown')
+  })
+
+  it('es la misma consulta que decide el veto', () => {
+    // La etiqueta de la interfaz y el veredicto no pueden divergir: los dos
+    // pasan por esta funcion.
+    for (const model of [...EU_MODELS, ...US_MODELS]) {
+      const declared = declaredResidency(DEFAULT_RESIDENCY_TABLE, HELMCODE_PROVIDER, model)
+      expect(declared, model).not.toBe('unknown')
+      const verdict = decideModelRoute('eu-only', DEFAULT_RESIDENCY_TABLE, HELMCODE_PROVIDER, model)
+      expect(verdict.kind === 'allow', model).toBe(declared === 'eu')
+    }
   })
 })

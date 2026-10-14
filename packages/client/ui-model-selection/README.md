@@ -43,6 +43,12 @@ Model and reasoning-effort names use weight 400 (regular) in the composer menu, 
 
 Both entries group models by provider, with DeepSeek Account first and DeepSeek second; third-party providers retain their catalog order. Both use the shared, asynchronously observed sticky headings from [ui-primitives](../ui-primitives/README.md#understand-the-implementation): transparent at rest, with the theme's 94%-opaque fill only while pinned, and `md` corners outside macOS Desktop. The composer menu shows model and effort names only. Navigation chevrons use `--dsw-alias-menu-icon`. The `/model` popup shows provider names as group headings and model names as rows, without repeating the provider on each row or showing catalog descriptions. Its search placeholder, no-match text, and empty-catalog text use the same localized labels as the composer model menu. The popup applies the selected model's default effort; the composer can then choose any advertised effort. An adapter without reasoning metadata leaves the Effort row absent; there is no arbitrary effort input.
 
+### Residency
+
+When the EU routing guard is mounted, every model row in the composer menu carries the route's declared residency under the model name: a green dot for `eu`, amber for `us`, grey for `unknown`. The label is the guard's own reading (`ctx.guardEuRouting`), asked at paint time and absent when no guard is mounted — fail-soft, with no label rather than a guess. Its copy comes from the brand's `helmcode` namespace, so the vocabulary has one owner. The label is informational: it never blocks a selection, and the veto remains the guard's decision on the Host.
+
+The dot carries the color and the text sits in the caption tone, so the label spends no accent ink; the accent budget's few strong indigo moments belong to the surfaces that carry them, not to a list row.
+
 The composer replaces the model and effort text with the Models icon when the expanded controls cannot share one line, and restores the text when space permits. The full selection remains available in the trigger's accessible name, tooltip, and menu.
 
 ### Unroutable sessions
@@ -66,6 +72,8 @@ Menus use the shared `MenuSurface` material, including the macOS backing for bac
 The composer `ModelSelect` and `/model` option builder share [provider ordering](src/client/provider-order.ts), while both searches use `rankByName` within each provider. The command supplies optional groups and `searchMode: 'fuzzy-label'` through the [popupSelect API](../ui-commands/README.md#use-this-package); both entries use `MenuGroup` and rebuild its sticky observer when the rendered groups change. The command popup fills the composer overlay, while the button retains its compact menu.
 
 Two entries over ONE per-session directory owned by `ModelDirectoryResolver` (`ctx.modelDirectories`): the `/model` popupSelect contribution (registered through `ctx.commandUi`) and the composer's named `conversation.input.model` seat both load the session's available directory through `session.models` and submit through `session.selectModel` via the same `ModelDirectory` instance, so a switch made in either entry is what the other shows next. Directory loads and selections share a generation counter so an older response never overwrites a newer one. The directory publishes the latest submitted selection as `pending` until it settles or a connection reset invalidates it; a connection reset drops every resident projection and repulls the Host-restored selection before display. Directories are per-session, resolved lazily, and disposed with the session scope; addressed subagent sessions expose neither entry. Every resident directory refetches directly on forwarded `llm/adapters-updated`, `settings/document-updated`, and credential update events.
+
+The seat's inject face also carries the residency reader: it closes over the client scope, asks `ctx.get('guardEuRouting')` on every call — so a guard mounted after the seat was injected still counts — and translates through the brand's `helmcode` namespace. The type-only import of the guard's browser half brings its `Context` merge, which is what types the lookup; the guard package is a devDependency, so no runtime edge exists between the two bundles.
 
 </details>
 
@@ -101,6 +109,7 @@ These limits define the current model surface. They are current package constrai
 - **No create-time or addressed-subagent selection** — both entries require an existing ordinary session's Agent; there is no draft-phase model choice to fold into session creation, and subagent continuation deliberately exposes no independent model-selection contract.
 - **Directory names are presentation-only** — selection and persistence use provider/model/effort ids; a provider whose catalog or exact-model metadata lookup fails lists as an unselectable failure row until reload.
 - **No arbitrary effort input** — the composer offers only the exact model's adapter-advertised levels; an adapter without reasoning metadata leaves the Effort row absent.
+- **Residency labels are the guard's declaration, not a measurement** — without the guard mounted there is no label at all, the label never blocks a selection, and in the browser the guard reads its default table (the browser Loader carries no row configuration), so a residency entry a profile adds shows as `unknown` there while the Host still enforces it.
 
 <a id="dev-note"></a>
 ### Dev Note
@@ -112,4 +121,4 @@ None.
 
 </details>
 
-**Runtime invariant:** No companion is published. The plugin registers a single command contribution, and the HMR-safety spec proves that the registration is disposed correctly. The plugin emits no Cordis events and owns no cross-plugin mutable state.
+**Runtime invariant:** No companion is published. The plugin registers a single command contribution and one seat, and the HMR-safety spec proves that both registrations are disposed correctly. The plugin emits no Cordis events and owns no mutable state; its residency reader is a pure read of an optional service.

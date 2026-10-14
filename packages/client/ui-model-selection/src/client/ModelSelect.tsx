@@ -23,7 +23,16 @@
  * Retry remains the catalog-load surface. While the directory's pending
  * selection is unsettled, the trigger shows a spinner in place of its
  * chevron, and each row whose value that selection carries shows one in place
- * of its check mark.
+ * of its check mark. When the residency guard is mounted, every model row also
+ * carries the route's declared residency next to the model name — the decision
+ * happens at model choice, so the signal belongs here — and without a mounted
+ * guard there is no label at all (fail-soft).
+ *
+ * Presupuesto de acento (brandbook): la etiqueta de residencia es texto tecnico
+ * pequeño y NO gasta indigo. El color lo lleva el punto de estado de la fila
+ * (verde `eu`, ambar `us`, gris `unknown`) y el texto va en el tono de caption;
+ * el indigo de acento queda reservado a los 4-5 momentos fuertes que una
+ * pantalla puede tener, y ninguna fila de lista es uno de ellos.
  */
 import { MenuGroup, MenuSurface, observeStickyMenuGroups } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
@@ -38,12 +47,24 @@ import {
   IconDataOutlineRegular, IconWarningOutlineRegular, Input, rankByName, StateDot, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ModelSelectInjected } from './slots.ts'
 import css from './ModelSelect.module.css'
 import { orderModelProviders } from './provider-order.ts'
 
 /** Which pane the dropdown shows: the two-row root or one drilled-in list. */
 type Pane = 'root' | 'model' | 'effort'
+
+/**
+ * El punto de color de cada residencia declarada: verde `eu`, ambar `us`, gris
+ * `unknown`. El color ES el punto (el texto va en el tono de caption), que es
+ * como esta etiqueta respeta el presupuesto de acento del brandbook.
+ */
+const RESIDENCY_DOT: Record<'eu' | 'us' | 'unknown', StateDotState> = {
+  eu: 'done',
+  us: 'warning',
+  unknown: 'idle',
+}
 
 /** One dynamic effort row; undefined means preserve the provider default. */
 interface EffortChoice {
@@ -62,7 +83,7 @@ const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
  * @returns the trigger and, while open, the two-level menu.
  */
 export function ModelSelect(
-  { locked, available, directory, load, select, t }:
+  { locked, available, directory, load, select, residency, t }:
   ModelSelectInjected & { locked: boolean } & PropsLocale<'model'>,
 ) {
   const state = useSyncExternalStore(
@@ -562,6 +583,8 @@ export function ModelSelect(
                       {group.models.map((model) => {
                         const index = modelIndex++
                         const selected = state.current?.provider === group.id && state.current.model === model.id
+                        // Fail-soft: sin guardia montada el lector contesta undefined y no hay etiqueta.
+                        const route = residency?.(group.id, model.id)
                         return (
                           <button
                             ref={itemRef()}
@@ -586,6 +609,12 @@ export function ModelSelect(
                           >
                             <span className={css.optionCopy}>
                               <span className={css.modelName}>{model.name}</span>
+                              {route !== undefined && (
+                                <span className={css.residency} data-residency={route.kind}>
+                                  <StateDot state={RESIDENCY_DOT[route.kind]} />
+                                  <span className={css.residencyLabel}>{route.label}</span>
+                                </span>
+                              )}
                             </span>
                             <span className={css.check}>
                               {pending?.provider === group.id && pending.model === model.id

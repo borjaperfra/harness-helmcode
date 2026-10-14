@@ -555,6 +555,11 @@ export function apply(ctx: Context, config: Config = {}): void {
         },
       },
       render(_args, value) {
+        // Presupuesto de acento (brandbook): el informe por fuente es TEXTO
+        // PLANO, sin estilo, de modo que no gasta momentos indigo. Si algun
+        // corte lo pinta, los nombres de fuente y los contadores tecnicos van en
+        // `accent-text` o en gris —nunca en el indigo base— y el acento no se
+        // usa en texto de cuerpo ni en separadores.
         if (value.sources.length === 0) {
           return [{
             type: 'text',
@@ -688,6 +693,10 @@ export function apply(ctx: Context, config: Config = {}): void {
         },
       },
       render(_args, value) {
+        // Presupuesto de acento: este resultado tambien es TEXTO PLANO y no
+        // gasta acento. Un corte que lo estilice pone la fuente, la puntuacion y
+        // el nombre de `index_workspace` en `accent-text` o en gris, jamas en el
+        // indigo base, y mantiene el acento fuera del texto de cuerpo.
         if (value.indexed === 0) {
           return [{
             type: 'text',

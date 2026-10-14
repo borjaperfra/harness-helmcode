@@ -7,7 +7,7 @@ kind: "package-reference"
 
 ## Summary
 
-This package gives the Web client the Helmcode identity from its own composition, without editing the shipped design system. It registers one alias-token layer over the active theme — warm-black canvas, one-step surfaces, the indigo signal and the brand's severity hues, plus square corners and the two brand families — injects the sheet that carries the Roboto faces, and occupies the sidebar brand seats with the kit's own vector lockup. Choose it for deployments branded as Helmcode; a deployment without that identity leaves it out of its roster. It has no runtime state and does not affect model requests.
+This package gives the Web client the Helmcode identity, without editing the shipped design system. It registers one alias-token layer over the active theme — warm-black canvas, one-step surfaces, the indigo signal, the severity hues, square corners and the two brand families — injects the sheet that carries the Roboto faces, registers the `helmcode` locale namespace with the brand's own vocabulary, and occupies the sidebar brand seats with the kit's own lockup. Choose it for deployments branded as Helmcode; a deployment without that identity leaves it out of its roster, and nothing here reaches a model request.
 
 ## Table of Contents
 
@@ -34,6 +34,12 @@ Square corners come from a zeroed radius scale, and the two families arrive as `
 ### Fonts
 
 `src/styles/helmcode.css` declares Roboto 300/400/500 and Roboto Mono 400/500 against `/fonts/*.woff2`, which the Web shell serves from its public directory (see `apps/web/public/fonts`). Both families are Apache-2.0; only the 300, 400 and 500 weights exist, because the brand forbids heavier weights and refuses synthesized bold.
+
+### The `helmcode` locale namespace
+
+The brand owns its own voice, so this package registers the `helmcode` namespace with Spanish (the source of truth) and English dictionaries: residency labels, plan quota, the session operator, the recovery index, the API-key onboarding and the `//` eyebrows that title Helmcode's own sections. `common` and `settings.locale` each have exactly one occupant, and a product voice that lived inside another owner's dictionary could not change without editing that owner.
+
+Other packages read it through the locale service — `ctx.locale.bind('helmcode')` — and the typed key union travels with this package's client entry. A composition without this package leaves those keys unresolved, which is the locale service's declared degradation, never invented copy elsewhere.
 
 ### Disabling or removing the skin
 
@@ -62,7 +68,7 @@ The kit provides the lockup for dark surfaces only, so the expanded row shows th
 
 `src/client/tokens.ts` holds the two columns and folds them into the `{ light, dark }` envelope `ctx.theme.overrideTokens` requires, keyed by every alias the shipped sheets declare. The override is the token-level analogue of slot shading: the base theme stays untouched and the layer retracts with this plugin's fiber.
 
-`src/client/styles.ts` mounts `src/styles/helmcode.css` as a plugin-owned sheet tagged with `data-plugin`, which the module system retracts on unload and HMR. `src/client/Brand.tsx` reproduces the kit's traced geometry, including the symbol inside the lockup's own coordinate box.
+`src/client/styles.ts` mounts `src/styles/helmcode.css` as a plugin-owned sheet tagged with `data-plugin`, which the module system retracts on unload and HMR. `src/client/Brand.tsx` reproduces the kit's traced geometry, including the symbol inside the lockup's own coordinate box. `src/client/locales.ts` holds the two dictionaries and `src/client/index.ts` registers them as one effect, so the namespace leaves with the fiber.
 
 The browser half is [`src/client/index.ts`](src/client/index.ts); the node half is an empty Loader seat.
 
@@ -109,4 +115,4 @@ None.
 
 </details>
 
-**Runtime invariant:** No companion is published. The token layer and the sheet install and leave through plugin-owned effects.
+**Runtime invariant:** No companion is published. The token layer, the dictionaries and the sheet install and leave through plugin-owned effects.

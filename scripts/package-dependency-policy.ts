@@ -57,6 +57,12 @@ const SAFE_HOST_DEPENDENCY_EXPORTS = {
 /** Runtime exports that require every consumer to resolve the provider's shared peer instance. */
 const PEER_REQUIRED_HOST_EXPORTS = {
   '@deepseek-ai/dsh-client-connection': ['OperatorPeer'],
+  // LlmError travels by identity: a consumer catches it with `instanceof`, so
+  // every thrower and catcher must share the llm package's single instance.
+  // Classified when the EU routing guard became a Client/Host package (it
+  // already declares the llm peer); the other llm consumers sit outside the
+  // dependency policy's discovered scope.
+  '@deepseek-ai/dsh-llm': ['LlmError'],
   '@deepseek-ai/dsh-subprocess': ['SubprocessExecutableNotFoundError'],
   '@deepseek-ai/dsh-scope': ['carrierKeyOf', 'createScope', 'scopeOf', 'scopeTarget'],
   '@deepseek-ai/dsh-session': ['SESSION_FORMAT_VERSION'],

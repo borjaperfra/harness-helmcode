@@ -2,9 +2,11 @@
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
+import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { apply, inject } from '../src/client/index.ts'
 import { HelmcodeBrandMark, HelmcodeBrandName } from '../src/client/Brand.tsx'
+import { en, NS, es } from '../src/client/locales.ts'
 import { apply as hostApply } from '../src/index.ts'
 
 const PLUGIN_ID = '@deepseek-ai/dsh-client-ui-brand-helmcode'
@@ -27,10 +29,11 @@ interface CapturedOverride {
 }
 
 /**
- * Build a client context carrying a recording theme stub and the real slot
- * registry, with the sidebar holes optionally declared first.
+ * Build a client context carrying a recording theme stub, the real slot
+ * registry, and a real locale runtime, with the sidebar holes optionally
+ * declared first.
  * @param declare - Whether to declare the brand holes before applying.
- * @returns The context, registry, recorder, and hole controls.
+ * @returns The context, registry, recorder, locale, and hole controls.
  */
 async function bench(declare = true) {
   const ctx = new Context()
@@ -43,12 +46,17 @@ async function bench(declare = true) {
       return (): void => { overrides.length = 0 }
     },
   } as never)
+  // There is no jsdom browser-language detection lane here, so the asserted
+  // locale is stated explicitly rather than derived.
+  const locale = new LocaleRuntime(ctx)
+  locale.setLocale('es')
+  ctx.provide('locale', locale)
   const declareHoles = (): (() => void) => slots.register({
     name: 'root',
     children: Object.fromEntries(HOLES.map(name => [name, { kind: 'single', scope: 'root' }])),
   } as never, () => null)
   const disposeHoles = declare ? declareHoles() : undefined
-  return { ctx, slots, overrides, declareHoles, disposeHoles }
+  return { ctx, slots, overrides, locale, declareHoles, disposeHoles }
 }
 
 describe('helmcode brand skin plugin', () => {
@@ -56,8 +64,30 @@ describe('helmcode brand skin plugin', () => {
     expect(hostApply).not.toThrow()
   })
 
-  it('declares the theme and slot services it uses', () => {
-    expect(inject).toEqual(['theme', 'slots'])
+  it('declares the theme, slot, and locale services it uses', () => {
+    expect(inject).toEqual(['theme', 'slots', 'locale'])
+  })
+
+  it('registers its own namespace under both languages and releases it with the fiber', async () => {
+    const subject = await bench()
+    const fiber = subject.ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    const translate = subject.ctx.locale.bind(NS)
+    expect(translate('residency.eu')).toBe(es['residency.eu'])
+    subject.locale.setLocale('en')
+    expect(translate('residency.eu')).toBe(en['residency.eu'])
+    expect(translate('eyebrow.plan')).toBe(en['eyebrow.plan'])
+
+    // A second registration of the same namespace is a duplicate occupant.
+    expect(() => subject.ctx.locale.register(NS, { es, en })).toThrow(/already has locale/)
+
+    // Withdrawn dictionaries leave the key unresolved rather than translated.
+    await fiber.dispose()
+    expect(translate('residency.eu')).not.toBe(en['residency.eu'])
+  })
+
+  it('keeps the English dictionary key-identical to the Spanish source of truth', () => {
+    expect(Object.keys(en).sort()).toEqual(Object.keys(es).sort())
   })
 
   it('registers one token layer whose every token carries both schemes', async () => {
