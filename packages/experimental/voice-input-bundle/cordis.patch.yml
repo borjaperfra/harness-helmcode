@@ -2,7 +2,9 @@
     - id: speech-to-text
       name: '@deepseek-ai/dsh-experimental-speech-to-text'
       config:
-        defaultProvider: sensevoice-local
+        defaultProvider: helmcode-whisper
+    - id: speech-to-text-helmcode
+      name: '@deepseek-ai/dsh-speech-to-text-helmcode'
     - id: speech-to-text-sensevoice
       name: '@deepseek-ai/dsh-experimental-speech-to-text-sensevoice'
       config:

@@ -7911,6 +7911,9 @@ importers:
       '@deepseek-ai/dsh-experimental-speech-to-text-sensevoice':
         specifier: workspace:*
         version: link:../speech-to-text-sensevoice
+      '@deepseek-ai/dsh-speech-to-text-helmcode':
+        specifier: workspace:*
+        version: link:../../speech/speech-to-text-helmcode
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:~

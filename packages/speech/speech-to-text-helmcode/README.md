@@ -91,8 +91,8 @@ The package is built on four commitments:
 Read these pages when the package-level contract is not enough. They move from the STT registry this package plugs into to the credential store that holds its key.
 
 - [Credentials subsystem reference](../../../docs/subsystems/credentials.md) — the `CredentialRef` resolution of `HELMCODE_API_KEY`.
-- [eu-routing guard](../guard/eu-routing/README.md) — the egress allowlist that already covers `api.helmcode.com`.
-- [`packages/experimental/speech-to-text`](../experimental/speech-to-text/README.md) — the provider interface and the registry this package registers on.
+- [eu-routing guard](../../guard/eu-routing/README.md) — the egress allowlist that already covers `api.helmcode.com`.
+- [`packages/experimental/speech-to-text`](../../experimental/speech-to-text/README.md) — the provider interface and the registry this package registers on.
 
 -----
 

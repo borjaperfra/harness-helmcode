@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This optional bundle composes a speech Service Definition, local SenseVoice provider, authenticated Remote and browser microphone control. Shipped profiles leave it disabled.
+This optional bundle composes a speech Service Definition, the Helmcode whisper recognizer (the default), the local SenseVoice recognizer, the authenticated Remote and the browser microphone control. Shipped profiles leave it disabled.
 
 ## Table of Contents
 
@@ -35,7 +35,7 @@ Open Plugins in the Web sidebar and enable Voice Input, marked by a blue wavefor
 <details>
 <summary>Maintainer details — click to expand</summary>
 
-The static `cordis.patch.yml` adds the four voice rows, selects `sensevoice-local` as the default recognizer and supplies the provider cache directory with `dshHomePath`. Optional-bundle installation makes the package available to management without selecting it in default profiles. The browser contribution owns its generated Remote mount; stable API Remotes do not import experimental code. No runtime invariant companion is published because this configuration-only package has no independently mutable runtime state.
+The static `cordis.patch.yml` adds the five voice rows, selects `helmcode-whisper` as the default recognizer, keeps the local `sensevoice-local` recognizer selectable and supplies the local provider cache directory with `dshHomePath`. The Helmcode provider resolves `HELMCODE_API_KEY` from the credential store and posts audio to `https://api.helmcode.com`, which the egress guard's allowlist already covers. Optional-bundle installation makes the package available to management without selecting it in default profiles. The browser contribution owns its generated Remote mount; stable API Remotes do not import experimental code. No runtime invariant companion is published because this configuration-only package has no independently mutable runtime state.
 
 </details>
 
@@ -61,7 +61,7 @@ No direct effect; ordinary submission owns the message content.
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- The initial bundle supplies one local recognizer. Additional providers register with the same service under distinct ids; cloud recognition requires an explicit new provider and credential configuration. The bundle does not add a model tool or change the agent loop.
+- The bundle supplies the cloud `helmcode-whisper` recognizer as the default and the local `sensevoice-local` recognizer as the alternative; further providers register with the same service under distinct ids. Cloud recognition needs a Helmcode API key in the credential store, and that audio leaves the machine for the EU endpoint of `https://api.helmcode.com`. The bundle does not add a model tool or change the agent loop.
 - Installing dsh also installs `sherpa-onnx-node` and its platform-specific native runtime, including ONNX Runtime, even when this bundle is disabled. Runtime installation adds disk and download costs separate from the models downloaded by Download and prepare; the native package size varies by platform and version.
 
 -----
