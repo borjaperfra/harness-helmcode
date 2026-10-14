@@ -8,9 +8,12 @@
  * la ruta `helmcode`. Sirve para avisar antes de agotar el cubo, nunca para
  * afirmar cuanto queda: eso solo lo sabe la consola de Helmcode.
  *
- * Solo cuenta rutas Helmcode: `bucketOf` devuelve `undefined` para cualquier
- * otro proveedor, y las rutas que sirven los mismos modelos (en esta maquina,
- * la ruta NaN) NO se imputan al plan. Ver `limits.ts`.
+ * Solo imputa al plan las rutas Helmcode: `bucketOf` devuelve `undefined` para
+ * cualquier otro proveedor, y las rutas que sirven los mismos modelos (en esta
+ * maquina, la ruta NaN) NO se imputan al plan. Pero tampoco se pierden: el
+ * medidor las cuenta en un cubo `nan` SEPARADO, que publica tokens sin tope
+ * —NaN no tiene tabla de limites publicada— y no entra ni en el cubo senalado
+ * ni en la tasa de rpm de la clave.
  *
  * La ventana de rpm se poda contra el tiempo del evento que se pliega, nunca
  * contra un reloj leido en el render: el plegado es una funcion pura de
@@ -27,13 +30,16 @@ export type {} from '@deepseek-ai/dsh-session-projection/types'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm'
 import {
-  DEFAULT_PLAN, KEY_LIMITS, bucketOf, largestBucket, quotaState,
+  DEFAULT_PLAN, KEY_LIMITS, NAN_PROVIDER, bucketOf, largestBucket, quotaState,
   type QuotaBucket,
 } from './limits.ts'
-import type { QuotaEstimateView } from './types.ts'
+import type { MeasuredBucket, QuotaEstimateView } from './types.ts'
 
-/** Los cubos en el orden fijo en que la vista los publica. */
-const BUCKETS: readonly QuotaBucket[] = ['sota', 'addon', 'unlimited']
+/**
+ * Los cubos en el orden fijo en que la vista los publica: los tres de la cuota
+ * de Helmcode y, al final, el de la ruta NaN, que no es cuota del plan.
+ */
+const BUCKETS: readonly MeasuredBucket[] = ['sota', 'addon', 'unlimited', 'nan']
 
 /** La ventana deslizante de la tasa de peticiones, en milisegundos. */
 export const RPM_WINDOW_MS = 60_000
@@ -43,7 +49,7 @@ export const QUOTA_PLAN = DEFAULT_PLAN
 
 /** Tokens y marcas de tiempo medidos en un cubo. */
 interface BucketUsage {
-  /** Tokens de las rutas Helmcode del cubo. */
+  /** Tokens medidos en el cubo: Helmcode, o la ruta NaN cuando el cubo es `nan`. */
   usedTokens: number
   /** Tiempos de las peticiones del cubo, sin podar. */
   timestamps: number[]
@@ -57,6 +63,12 @@ export interface QuotaEstimateState {
   addon: BucketUsage | null
   /** Consumo del cubo sin tope. */
   unlimited: BucketUsage | null
+  /**
+   * Consumo de la ruta NaN, en su cubo aparte: no es cuota de Helmcode y no
+   * tiene tope publicado, asi que solo acumula tokens (con sus tiempos, que la
+   * ventana de rpm de la clave NO usa).
+   */
+  nan: BucketUsage | null
   /** La vista publicada; se pliega con el estado para que su referencia sea estable. */
   view: QuotaEstimateView
 }
@@ -96,17 +108,25 @@ function accumulate(
 
 /**
  * Proyecta el consumo medido a la vista que el cliente lee.
+ *
+ * El cubo senalado y su tope salen SOLO de los tres cubos de Helmcode: el
+ * consumo de NaN no imputa nada a un plan que no es suyo, y por eso no puede
+ * convertirse en el cubo que la tarjeta senala. Aparece, con sus tokens, en
+ * `buckets[]`, que es donde el operador ve lo que NaN ha gastado.
+ *
  * @param measured - consumo por cubo y sus marcas de tiempo.
  * @returns la estimacion actual, con el cubo de mayor consumo senalado.
  */
-function projectView(measured: Pick<QuotaEstimateState, 'sota' | 'addon' | 'unlimited'>): QuotaEstimateView {
+function projectView(
+  measured: Pick<QuotaEstimateState, 'sota' | 'addon' | 'unlimited' | 'nan'>,
+): QuotaEstimateView {
   const used: Record<QuotaBucket, number> = {
     sota: measured.sota?.usedTokens ?? 0,
     addon: measured.addon?.usedTokens ?? 0,
     unlimited: measured.unlimited?.usedTokens ?? 0,
   }
-  // Los tiempos de todos los cubos forman una sola tasa por key: el limite de
-  // rpm es de la clave, no del modelo.
+  // Los tiempos de los cubos de Helmcode forman una sola tasa por key: el limite
+  // de rpm es de la clave. Los de NaN NO entran: esa ruta no gasta esa clave.
   const fresh = [
     ...(measured.sota?.timestamps ?? []),
     ...(measured.addon?.timestamps ?? []),
@@ -120,12 +140,15 @@ function projectView(measured: Pick<QuotaEstimateState, 'sota' | 'addon' | 'unli
     capTokens: state?.capTokens ?? null,
     status: state?.status ?? 'ok',
     window: { rpm: fresh.length, limit: KEY_LIMITS.requestsPerMinute },
-    buckets: BUCKETS.map(bucket => ({ bucket, usedTokens: used[bucket] })),
+    buckets: BUCKETS.map(bucket => ({
+      bucket,
+      usedTokens: bucket === 'nan' ? measured.nan?.usedTokens ?? 0 : used[bucket],
+    })),
   }
 }
 
 const bucketUsageSchema = z.object({
-  bucket: z.enum(['sota', 'addon', 'unlimited']),
+  bucket: z.enum(['sota', 'addon', 'unlimited', 'nan']),
   usedTokens: z.number().nonnegative(),
 }).strict()
 
@@ -147,12 +170,13 @@ const quotaEstimateStateSchema = z.object({
   sota: bucketUsageStateSchema.nullable(),
   addon: bucketUsageStateSchema.nullable(),
   unlimited: bucketUsageStateSchema.nullable(),
+  nan: bucketUsageStateSchema.nullable(),
   view: quotaEstimateSchema,
 }).strict()
 
-/** La vista de una sesion sin ninguna llamada Helmcode. */
+/** La vista de una sesion sin ninguna llamada medida. */
 function emptyView(): QuotaEstimateView {
-  return projectView({ sota: null, addon: null, unlimited: null })
+  return projectView({ sota: null, addon: null, unlimited: null, nan: null })
 }
 
 /**
@@ -160,9 +184,10 @@ function emptyView(): QuotaEstimateView {
  *
  * `assistant/message` es el evento que se cuenta: lleva a la vez el `usage` del
  * proveedor y la fuente (`message.source`) con la RUTA y el modelo que la
- * sirvieron, que es lo que `bucketOf` necesita para decidir si el consumo es de
- * Helmcode. Cualquier otro evento devuelve la MISMA referencia, que es lo que
- * mantiene el feed de cambios en silencio.
+ * sirvieron, que es lo que decide el cubo. Una llamada de Helmcode va a su cubo
+ * de cuota; una de la ruta NaN va a `nan`, aparte, para que su consumo se vea
+ * sin imputarse a un plan que no es suyo. Cualquier otro evento devuelve la
+ * MISMA referencia, que es lo que mantiene el feed de cambios en silencio.
  *
  * @param state - estado que cubre todos los eventos anteriores.
  * @param event - el siguiente evento comprometido.
@@ -177,13 +202,15 @@ export function foldQuotaEstimate(state: QuotaEstimateState, event: SessionEvent
   // recibiria `undefined` en lugar de un cubo.
   // oxlint-disable-next-line typescript/no-unnecessary-condition -- log duradero, no solo el tipo en memoria
   if (source.kind !== 'model') return state
-  const bucket = bucketOf(source.provider, source.model)
-  if (bucket === undefined) return state
+  const measured: MeasuredBucket | undefined =
+    bucketOf(source.provider, source.model)
+    ?? (source.provider === NAN_PROVIDER ? 'nan' : undefined)
+  if (measured === undefined) return state
   const tokens = usageTokens(event.data.usage)
   const cutoff = event.time - RPM_WINDOW_MS
   const next: QuotaEstimateState = {
     ...state,
-    [bucket]: accumulate(state[bucket], tokens, event.time),
+    [measured]: accumulate(state[measured], tokens, event.time),
   }
   for (const name of BUCKETS) {
     const current = next[name]
@@ -202,7 +229,7 @@ export const quotaEstimateProjectionDefinition = {
   key: 'quotaEstimate',
   stateVersion: 1,
   stateSchema: quotaEstimateStateSchema,
-  init: () => ({ sota: null, addon: null, unlimited: null, view: emptyView() }),
+  init: () => ({ sota: null, addon: null, unlimited: null, nan: null, view: emptyView() }),
   apply: foldQuotaEstimate,
   wire: {
     viewSchema: quotaEstimateSchema,

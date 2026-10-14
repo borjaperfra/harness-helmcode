@@ -62,12 +62,13 @@ describe('@deepseek-ai/dsh-retrieval-helmcode: superficie publica', () => {
   it('viaja entero contra el indice real: trocear, coseno y rerank', async () => {
     const index = new retrieval.RetrievalIndex(':memory:')
     try {
+      const workspace = retrieval.DEFAULT_WORKSPACE_ID
       const chunks = retrieval.chunkText('Una nota con texto suficiente.')
       expect(chunks).toHaveLength(1)
-      index.upsertSource('nota', chunks.map(chunk => ({ ...chunk, embedding: [1, 0] })))
+      index.upsertSource(workspace, 'nota', chunks.map(chunk => ({ ...chunk, embedding: [1, 0] })))
 
       const hits = await retrieval.search(
-        index,
+        { candidates: (vector, limitK) => index.candidates(workspace, vector, limitK) },
         { embed: () => Promise.resolve([[1, 0]]) },
         { rerank: (_query, documents, _topN) => Promise.resolve(documents.map((_text, i) => ({ index: i, score: 1 - i / 10 }))) },
         'nota',

@@ -15,12 +15,21 @@
  * El fichero es PROPIO por ruta de constructor: el cableado le pasa la ruta del
  * perfil y cada indice vive y se cierra solo.
  *
+ * **La clave de particion lleva el workspace.** Cada fila guarda su
+ * `workspace` —el hash que calcula `./workspace.ts` sobre el cwd de la sesion— y
+ * la clave primaria es `(workspace, source, position)`, que es la forma SQL de
+ * `workspaceId + '/' + source`. Dos proyectos con una fuente llamada `manual` no
+ * comparten fila: reindexar uno no borra los embeddings del otro, y una busqueda
+ * solo ve los trozos del workspace que la pidio. Una llamada sin cwd cae en su
+ * propia particion, que es un workspace mas.
+ *
  * @module @deepseek-ai/dsh-retrieval-helmcode/store
  */
 
 import { DatabaseSync, type StatementSync } from 'node:sqlite'
 import { RetrievalError } from './errors.ts'
 import type { Embedding } from './embed.ts'
+import { DEFAULT_WORKSPACE_ID } from './workspace.ts'
 
 /** Un trozo tal como se guarda: texto, posicion original y vector. */
 export interface IndexChunk {
@@ -64,6 +73,7 @@ type ChunkRow = {
 /** El esquema del indice: un trozo por fila, con su vector serializado. */
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS chunks (
+    workspace    TEXT    NOT NULL,
     source       TEXT    NOT NULL,
     position     INTEGER NOT NULL,
     start_offset INTEGER NOT NULL,
@@ -71,7 +81,7 @@ const SCHEMA = `
     text         TEXT    NOT NULL,
     dimensions   INTEGER NOT NULL,
     embedding    TEXT    NOT NULL,
-    PRIMARY KEY (source, position)
+    PRIMARY KEY (workspace, source, position)
   ) STRICT
 `
 
@@ -122,32 +132,36 @@ export class RetrievalIndex {
   constructor(path: string) {
     this.db = new DatabaseSync(path)
     this.db.exec(SCHEMA)
-    this.removeSourceStatement = this.db.prepare('DELETE FROM chunks WHERE source = ?')
+    this.removeSourceStatement = this.db.prepare('DELETE FROM chunks WHERE workspace = ? AND source = ?')
     this.insertStatement = this.db.prepare(
-      'INSERT INTO chunks (source, position, start_offset, end_offset, text, dimensions, embedding) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO chunks (workspace, source, position, start_offset, end_offset, text, dimensions, embedding) '
+      + 'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     )
     this.selectCandidatesStatement = this.db.prepare(
-      'SELECT source, position, text, dimensions, embedding FROM chunks ORDER BY source, position',
+      'SELECT source, position, text, dimensions, embedding FROM chunks WHERE workspace = ? ORDER BY source, position',
     )
-    this.countStatement = this.db.prepare('SELECT COUNT(*) AS total FROM chunks')
-    this.sourcesStatement = this.db.prepare('SELECT DISTINCT source FROM chunks ORDER BY source')
+    this.countStatement = this.db.prepare('SELECT COUNT(*) AS total FROM chunks WHERE workspace = ?')
+    this.sourcesStatement = this.db.prepare('SELECT DISTINCT source FROM chunks WHERE workspace = ? ORDER BY source')
   }
 
   /**
-   * Reemplaza los trozos de un documento.
+   * Reemplaza los trozos de un documento DENTRO de un workspace.
    *
    * Es un reemplazo, no una mezcla: los trozos que no esten en `chunks` dejan de
    * existir, que es lo que hace que reindexar un documento editado no deje
-   * versiones viejas compitiendo en la busqueda.
+   * versiones viejas compitiendo en la busqueda. El reemplazo no cruza de
+   * workspace: la misma fuente en otro proyecto conserva sus trozos.
    *
+   * @param workspace - identificador de particion del workspace (ver `./workspace.ts`).
    * @param source - ruta logica del documento.
    * @param chunks - los trozos del documento, en orden.
    */
-  upsertSource(source: string, chunks: readonly IndexChunk[]): void {
+  upsertSource(workspace: string, source: string, chunks: readonly IndexChunk[]): void {
     this.ensureOpen()
-    this.removeSourceStatement.run(source)
+    this.removeSourceStatement.run(workspace, source)
     for (const [position, chunk] of chunks.entries()) {
       this.insertStatement.run(
+        workspace,
         source,
         position,
         chunk.start,
@@ -160,19 +174,22 @@ export class RetrievalIndex {
   }
 
   /**
-   * Borra un documento y todos sus trozos.
+   * Borra un documento y todos sus trozos de un workspace.
    *
+   * @param workspace - identificador de particion del workspace.
    * @param source - ruta logica del documento.
    * @returns cuantos trozos se borraron.
    */
-  removeSource(source: string): number {
+  removeSource(workspace: string, source: string): number {
     this.ensureOpen()
-    return Number(this.removeSourceStatement.run(source).changes)
+    return Number(this.removeSourceStatement.run(workspace, source).changes)
   }
 
   /**
-   * Los `limitK` trozos mas parecidos al vector, por coseno.
+   * Los `limitK` trozos mas parecidos al vector, por coseno, dentro de un
+   * workspace.
    *
+   * @param workspace - identificador de particion del workspace.
    * @param vector - el vector de la consulta.
    * @param limitK - cuantos candidatos devolver como maximo.
    * @returns los candidatos de mayor a menor similitud (empates en orden de
@@ -180,9 +197,9 @@ export class RetrievalIndex {
    * @throws {RetrievalError} DIMENSION si un trozo guardado no mide lo mismo que
    * el vector consultado.
    */
-  candidates(vector: Embedding, limitK: number): Candidate[] {
+  candidates(workspace: string, vector: Embedding, limitK: number): Candidate[] {
     this.ensureOpen()
-    const rows = this.selectCandidatesStatement.all() as ChunkRow[]
+    const rows = this.selectCandidatesStatement.all(workspace) as ChunkRow[]
     const scored: Candidate[] = []
     for (const row of rows) {
       if (row.dimensions !== vector.length) {
@@ -204,25 +221,29 @@ export class RetrievalIndex {
   }
 
   /**
-   * Cuantos trozos guarda el indice.
+   * Cuantos trozos guarda un workspace del indice.
    *
-   * @returns el total de trozos.
+   * @param workspace - identificador de particion del workspace; por defecto, la
+   * particion de las llamadas sin cwd.
+   * @returns el total de trozos de esa particion.
    */
-  count(): number {
+  count(workspace: string = DEFAULT_WORKSPACE_ID): number {
     this.ensureOpen()
     // `COUNT(*)` siempre devuelve una fila, asi que no hay ausencia que tratar.
-    const row = this.countStatement.get() as { total: number }
+    const row = this.countStatement.get(workspace) as { total: number }
     return row.total
   }
 
   /**
-   * Los documentos indexados, sin repetir y en orden.
+   * Los documentos indexados en un workspace, sin repetir y en orden.
    *
+   * @param workspace - identificador de particion del workspace; por defecto, la
+   * particion de las llamadas sin cwd.
    * @returns las rutas logicas de los documentos con al menos un trozo.
    */
-  sources(): string[] {
+  sources(workspace: string = DEFAULT_WORKSPACE_ID): string[] {
     this.ensureOpen()
-    const rows = this.sourcesStatement.all() as Array<{ source: string }>
+    const rows = this.sourcesStatement.all(workspace) as Array<{ source: string }>
     return rows.map(row => row.source)
   }
 

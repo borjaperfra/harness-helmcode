@@ -258,6 +258,40 @@ interface RedactionCount {
   readonly count: number
 }
 
+/**
+ * El contrato minimo del seam `privacy`: lo que un consumidor de fuera de este
+ * plugin —hoy, `export_audit` de la recuperacion— necesita para tapar datos
+ * personales con el MISMO mapa sellado que usan las herramientas de aqui, sin
+ * conocer ni el fichero ni la clave.
+ */
+export interface PrivacySeam {
+  /**
+   * Redacta un texto contra el mapa sellado.
+   *
+   * @param text - el texto original.
+   * @returns el texto con los marcadores estables del mapa.
+   * @throws cuando el mapa no se puede abrir o sellar: el fallo es cerrado, igual
+   * que en las herramientas, y nunca devuelve el texto sin redactar.
+   */
+  redact(text: string): Promise<string>
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /**
+     * El canal de redaccion de este plugin, para consumidores de FUERA del
+     * paquete (hoy `export_audit`, en la recuperacion).
+     *
+     * Es OPCIONAL por la misma razon que las otras guardias del arbol: este
+     * plugin no tiene por que estar montado, y un consumidor que lo pregunte
+     * tiene que poder recibir "no hay mapa montado" sin que la composicion deje
+     * de compilar. Se lee en CADA llamada (`ctx.get('privacy')`) y su ausencia
+     * es una respuesta, no un fallo: quien exporte un log lo declara.
+     */
+    privacy?: PrivacySeam
+  }
+}
+
 /** Cuenta los hallazgos por tipo, en orden de puntos de codigo (estable). */
 function countByType(findings: readonly RedactionFinding[]): RedactionCount[] {
   const counts = new Map<PiiType, number>()
@@ -286,9 +320,11 @@ function renderRedaction(
   mapChanged: boolean,
 ): string {
   if (findings.length === 0) {
-    return `No Spanish PII was detected in ${source}: nothing was redacted. `
-      + 'The local session log keeps the original content.'
-      + `\n\n${text}`
+    // El mensaje NO afirma certeza: los detectores cubren unos formatos con
+    // checksum, y lo que no cubren no es "no hay PII", es "no la hemos visto".
+    return `No se detectaron patrones de PII española en ${source}; los nombres, direcciones y fechas de `
+      + 'nacimiento no se cubren automáticamente. Nothing was redacted, and the local session log keeps the '
+      + `original content.\n\n${text}`
   }
   const counts = countByType(findings).map(count => `${count.type} ${count.count}`).join(', ')
   return `Redacted ${findings.length} value(s) in ${source}: ${counts}. `
@@ -356,6 +392,15 @@ export function apply(ctx: Context, config: Config = {}): void {
     throw new Error('privacy-helmcode: ttlDays must be a positive number of days')
   }
   const store = new SealedMapFile(ctx, mapPath, mapKeyRef)
+
+  // El seam se provee con el plugin y comparte el MISMO mapa y la MISMA
+  // caducidad que las herramientas: un consumidor que lo lea con
+  // `ctx.get('privacy')` aplica los mismos marcadores, y uno que no lo
+  // encuentre sabe que no hay mapa montado. El fallo es el del mapa (cerrado),
+  // nunca un texto sin redactar devuelto en silencio.
+  ctx.provide('privacy', {
+    redact: async (text: string) => (await redactThrough(store, text, ttlDays)).text,
+  })
 
   ctx.tools.register(defineTool({
     name: 'anonymize',

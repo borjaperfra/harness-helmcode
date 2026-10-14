@@ -21,7 +21,10 @@ import type { Candidate } from './store.ts'
 /**
  * Lo que el pipeline necesita del indice.
  *
- * {@link RetrievalIndex} lo cumple tal cual; un doble de test tambien.
+ * {@link RetrievalIndex} lo cumple acotado a un workspace: el cableado le pasa
+ * una vista (`candidates` con la particion ya fijada), porque el indice de disco
+ * es uno por perfil y el pipeline de una busqueda es de un solo workspace. Un
+ * doble de test tambien lo cumple tal cual.
  */
 export interface CandidateIndex {
   /**

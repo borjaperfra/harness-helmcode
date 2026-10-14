@@ -109,6 +109,73 @@ describe('detectPii: numeros desnudos y demas tipos', () => {
   })
 })
 
+describe('detectPii: separadores reales dentro del dato', () => {
+  it('acepta el DNI con guion y con puntos, y guarda el literal original', () => {
+    expect(detectPii('Titular 12345678-Z.')).toEqual([
+      { type: 'DNI', value: '12345678-Z', start: 8, end: 18 },
+    ])
+    expect(onlyValue('Titular 12.345.678-Z.')).toBe('12.345.678-Z')
+    expect(typesOf('12.345.678-Z y 12345678Z')).toEqual(['DNI', 'DNI'])
+  })
+
+  it('valida el checksum sobre los digitos, no sobre el literal', () => {
+    // La letra sigue saliendo del mod-23 de los ocho digitos: el separador no
+    // la cambia, y una letra equivocada no se redacta.
+    expect(detectPii('12.345.678-A')).toEqual([])
+    expect(detectPii('12345678-A')).toEqual([])
+  })
+
+  it('acepta el telefono con prefijo internacional, con o sin espacios', () => {
+    expect(onlyValue('Llamar al +34600123456 ahora')).toBe('+34600123456')
+    expect(onlyValue('Llamar al +34 600 123 456 ahora')).toBe('+34 600 123 456')
+    expect(onlyValue('Llamar al 0034 600 123 456 ahora')).toBe('0034 600 123 456')
+    expect(onlyValue('Llamar al 0034600123456 ahora')).toBe('0034600123456')
+    expect(onlyValue('Llamar al 600-123-456 ahora')).toBe('600-123-456')
+  })
+
+  it('no inventa un telefono detras de un prefijo sin numero espanol', () => {
+    // El 5 no es movil ni fijo: el prefijo no basta para declarar un hallazgo.
+    expect(detectPii('+34 512 345 678')).toEqual([])
+    expect(detectPii('+34 512345678')).toEqual([])
+  })
+
+  it('acepta el IBAN con los espacios de sus grupos de cuatro', () => {
+    expect(detectPii('Cuenta ES91 2100 0418 4502 0005 1332 del cliente')).toEqual([
+      { type: 'IBAN', value: 'ES91 2100 0418 4502 0005 1332', start: 7, end: 36 },
+    ])
+  })
+
+  it('rechaza el IBAN con espacios si el digito de control no valida', () => {
+    expect(detectPii('ES91 2100 0418 4502 0005 1333')).toEqual([])
+  })
+
+  it('acepta el NUSS con barras y valida su digito de control', () => {
+    expect(onlyValue('Afiliacion 28/12345678/40')).toBe('28/12345678/40')
+    expect(onlyValue('Afiliacion 281234567840')).toBe('281234567840')
+    expect(detectPii('Afiliacion 28/12345678/41')).toEqual([])
+    expect(detectPii('Afiliacion 281234567841')).toEqual([])
+  })
+
+  it('acepta el numero de historia clinica con etiqueta NHC', () => {
+    expect(onlyValue('Historia NHC: 1234567 abierta')).toBe('NHC: 1234567')
+    expect(onlyValue('Historia NHC 1234567 abierta')).toBe('NHC 1234567')
+    expect(onlyValue('Historia NHC:1234567 abierta')).toBe('NHC:1234567')
+    expect(detectPii('Historia NHC: 123 abierta')).toEqual([])
+  })
+
+  it('acepta la tarjeta agrupada de cuatro en cuatro y la rechaza si Luhn falla', () => {
+    expect(typesOf('Tarjeta 4539 5787 6362 1486')).toEqual(['CARD'])
+    expect(detectPii('Tarjeta 4539 5787 6362 1487')).toEqual([])
+  })
+
+  it('no declara una tarjeta de 12 ni de 20 digitos', () => {
+    // Doce digitos no son tarjeta (y sin digito de control valido tampoco son
+    // NUSS); veinte se salen del rango de las tarjetas.
+    expect(detectPii('281234567841')).toEqual([])
+    expect(detectPii('12345678901234567890')).toEqual([])
+  })
+})
+
 describe('detectPii: solapes por precedencia y posicion', () => {
   it('deja ganar al correo sobre el DNI que lo precede', () => {
     const findings = detectPii('12345678Z@bufete.example')

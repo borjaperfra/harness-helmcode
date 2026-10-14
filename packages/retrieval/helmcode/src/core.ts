@@ -1,7 +1,8 @@
 /**
  * El nucleo puro de recuperacion de Helmcode, reexportado en un solo modulo: el
- * troceador consciente de parrafos, el embedder, el reranker, el indice local y
- * el pipeline `embed → coseno → rerank`.
+ * troceador consciente de parrafos, el embedder, el reranker, el indice local
+ * particionado por workspace, el pipeline `embed → coseno → rerank` y el
+ * exportador del log de la sesion.
  *
  * Vive aparte de `./index.ts` porque `index.ts` es el CABLEADO —el seam
  * `ctx.retrieval` y las dos herramientas—: este fichero mantiene la superficie
@@ -14,6 +15,7 @@
  * @module @deepseek-ai/dsh-retrieval-helmcode/core
  */
 
+export * from './audit.ts'
 export * from './chunk.ts'
 export * from './embed.ts'
 export * from './errors.ts'
@@ -21,3 +23,4 @@ export * from './http.ts'
 export * from './rerank.ts'
 export * from './search.ts'
 export * from './store.ts'
+export * from './workspace.ts'

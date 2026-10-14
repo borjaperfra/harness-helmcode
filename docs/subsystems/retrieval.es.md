@@ -2,7 +2,7 @@
 
 [English](retrieval.md) | Español
 
-`ctx.retrieval` es el seam de recuperación local que declara y provee el [paquete retrieval-helmcode](../../packages/retrieval/helmcode/README.md): un índice SQLite bajo el home del harness y las dos operaciones que lo escriben y lo consultan. El paquete publica además las dos herramientas que el modelo maneja, de modo que la capacidad es explícita —no hay interceptor, y ningún texto se indexa ni se recupera a espaldas del agente.
+`ctx.retrieval` es el seam de recuperación local que declara y provee el [paquete retrieval-helmcode](../../packages/retrieval/helmcode/README.md): un índice SQLite bajo el home del harness y las dos operaciones que lo escriben y lo consultan. El paquete publica además las cuatro herramientas que el modelo maneja —`index_workspace`, `index_url`, `knowledge_search` y `export_audit`—, de modo que la capacidad es explícita: no hay interceptor, y ningún texto se indexa ni se recupera a espaldas del agente.
 
 El seam existe porque el modelo necesita respuestas ancladas sobre documentos que el despliegue nombra, y porque el harness no tiene un seam de red por el que encaminar ese tráfico: el núcleo puro recibe un `fetch` inyectado y el cableado le pasa `globalThis.fetch` leído en cada operación, así que el egreso de esta capacidad es una decisión de la composición, no un accidente de los valores por defecto.
 
@@ -10,10 +10,12 @@ El seam existe porque el modelo necesita respuestas ancladas sobre documentos qu
 
 | Operación | Qué hace | Qué cuesta |
 |---|---|---|
-| `indexSource(source, text)` | Trocea el documento, embebe cada trozo por `/v1/embeddings` de Helmcode (`qwen3-embedding`) y REEMPLAZA las filas de esa fuente en el índice, de modo que reindexar un fichero editado no deja trozos viejos compitiendo en la búsqueda. | Una petición de embeddings por lote; ninguna para un documento sin texto utilizable, que es un no-op declarado. |
-| `search(query, topN?)` | Embebe la consulta, ordena los trozos indexados por coseno bruto sobre el índice local, reranquea los `topK` candidatos por `/v1/rerank` y devuelve los mejores `topN` (`8` y `4` por defecto). | Una petición de embeddings más una de rerank, y ninguna cuando el índice no guarda ningún trozo. |
+| `indexSource(source, text, workspace?)` | Trocea el documento, embebe cada trozo por `/v1/embeddings` de Helmcode (`qwen3-embedding`) y REEMPLAZA las filas de esa fuente en el índice, de modo que reindexar un fichero editado no deja trozos viejos compitiendo en la búsqueda. | Una petición de embeddings por lote; ninguna para un documento sin texto utilizable, que es un no-op declarado. |
+| `search(query, topN?, workspace?)` | Embebe la consulta, ordena los trozos indexados por coseno bruto sobre el índice local, reranquea los `topK` candidatos por `/v1/rerank` y devuelve los mejores `topN` (`8` y `4` por defecto). | Una petición de embeddings más una de rerank, y ninguna cuando el índice no guarda ningún trozo. |
 
 Las dos operaciones resuelven la clave de la API en `ctx.credentials` al PRINCIPIO de la llamada, así que una clave ausente o rotada es un fallo en la llamada siguiente y no un valor cacheado obsoleto; el índice se abre perezosamente en el primer uso, de modo que un perfil que nunca indexa nunca crea el fichero. La clave, la raíz de la API, la ruta del índice, la tabla de fuentes y los dos tamaños salen del `Config` del plugin; la referencia `HELMCODE_API_KEY` y `<DSH_HOME>/retrieval/index.sqlite` son los valores por defecto.
+
+**El índice se particiona por workspace.** Cada fila lleva el hash del cwd de la sesión y la clave primaria es `(workspace, source, position)`, así que dos proyectos que declaren una fuente con el mismo nombre nunca se pisan los embeddings y una búsqueda solo ve el workspace que la pidió. Una llamada sin cwd cae en su propia partición.
 
 ## Qué NO hace
 
@@ -41,45 +43,52 @@ El indice se abre PEREZOSAMENTE sobre `indexPath` y se cierra con el plugin. La 
 
 ```ts cordis-catalog
 /**
- * Cuantos trozos guarda el indice local.
+ * Cuantos trozos guarda el indice local de un workspace.
  *
- * @returns el total de trozos indexados; 0 cuando aun no se ha indexado nada.
+ * @param workspace - particion del workspace (ver `./workspace.ts`); ausente,
+ * la de las llamadas sin cwd.
+ * @returns el total de trozos indexados en esa particion; 0 cuando aun no se
+ * ha indexado nada ahi.
  */
-count(): number
+count(workspace: string = DEFAULT_WORKSPACE_ID): number
 
 /**
- * Trocea, embebe y guarda un documento en el indice local.
+ * Trocea, embebe y guarda un documento en el indice local de un workspace.
  *
- * El documento se REEMPLAZA entero: reindexar un fichero editado no deja sus
- * trozos viejos compitiendo en la busqueda. Un documento sin texto utilizable es
- * un no-op declarado —no se embebe nada, no se toca el indice y no se gasta
- * ninguna peticion—, y la clave se resuelve ANTES de mirar el texto: sin clave
- * esta operacion falla en vez de fingir que indexo.
+ * El documento se REEMPLAZA entero DENTRO de su particion: reindexar un
+ * fichero editado no deja sus trozos viejos compitiendo en la busqueda, y no
+ * toca la fuente del mismo nombre en otro workspace. Un documento sin texto
+ * utilizable es un no-op declarado —no se embebe nada, no se toca el indice y
+ * no se gasta ninguna peticion—, y la clave se resuelve ANTES de mirar el
+ * texto: sin clave esta operacion falla en vez de fingir que indexo.
  *
  * @param source - nombre logico del documento, el que la busqueda cita.
  * @param text - el documento completo.
+ * @param workspace - particion del workspace; ausente, la de las llamadas sin cwd.
  * @returns los trozos guardados y las peticiones enviadas a Helmcode.
  * @throws {RetrievalToolError} MISSING_CREDENTIAL sin clave utilizable,
  * NO_TRANSPORT sin `globalThis.fetch`, o el codigo del nucleo (AUTH, CREDITS,
  * RATE_LIMIT, PROVIDER, MALFORMED, DIMENSION) cuando Helmcode rechaza la llamada.
  */
-async indexSource(source: string, text: string): Promise<SourceIndexOutcome>
+async indexSource(source: string, text: string, workspace: string = DEFAULT_WORKSPACE_ID): Promise<SourceIndexOutcome>
 
 /**
- * Ejecuta `embed → coseno → rerank` sobre el indice local.
+ * Ejecuta `embed → coseno → rerank` sobre el indice local de un workspace.
  *
- * Sin trozos indexados no hay recuperacion que hacer y no se manda nada: se
- * DICE. Con trozos, la clave se resuelve antes de embeber la consulta, asi que
- * un fallo de credencial sale como fallo y nunca como una lista vacia.
+ * Sin trozos indexados en esa particion no hay recuperacion que hacer y no se
+ * manda nada: se DICE. Con trozos, la clave se resuelve antes de embeber la
+ * consulta, asi que un fallo de credencial sale como fallo y nunca como una
+ * lista vacia.
  *
  * @param query - la consulta del usuario.
  * @param topN - cuantos resultados devolver; ausente, el `topN` de la configuracion.
- * @returns los trozos que tenia el indice y los resultados reranqueados.
+ * @param workspace - particion del workspace; ausente, la de las llamadas sin cwd.
+ * @returns los trozos que tenia esa particion y los resultados reranqueados.
  * @throws {RetrievalToolError} MISSING_CREDENTIAL sin clave utilizable,
  * NO_TRANSPORT sin `globalThis.fetch`, o el codigo del nucleo cuando Helmcode
  * rechaza la llamada.
  */
-async search(query: string, topN?: number): Promise<SearchOutcome>
+async search(query: string, topN?: number, workspace: string = DEFAULT_WORKSPACE_ID): Promise<SearchOutcome>
 ```
 
 Source: [`packages/retrieval/helmcode/src/index.ts`](../../packages/retrieval/helmcode/src/index.ts)

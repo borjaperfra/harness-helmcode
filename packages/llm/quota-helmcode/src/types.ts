@@ -13,11 +13,24 @@ import type { QuotaBucket, QuotaStatus } from './limits.ts'
 // bindings se elide entero.
 export type {} from '@deepseek-ai/dsh-session-projection/types'
 
+/**
+ * Los cubos que la vista publica: los tres de la cuota de Helmcode mas `nan`.
+ *
+ * `nan` es el consumo de la ruta que sirve los mismos modelos por otra puerta.
+ * No es cuota de Helmcode, no entra en el cubo senalado y no se mezcla con
+ * ninguno de los tres: solo aparece, con sus tokens, en `buckets[]`. Tampoco
+ * tiene tope, porque su tabla de limites no esta publicada.
+ */
+export type MeasuredBucket = QuotaBucket | 'nan'
+
 /** Tokens y peticiones medidos en un cubo. */
 export interface QuotaBucketUsage {
   /** Cubo medido. */
-  readonly bucket: QuotaBucket
-  /** Tokens acumulados de las rutas Helmcode del cubo. */
+  readonly bucket: MeasuredBucket
+  /**
+   * Tokens acumulados: de las rutas Helmcode del cubo, o de la ruta NaN cuando
+   * el cubo es `nan` (que no tiene tope y solo muestra consumo).
+   */
   readonly usedTokens: number
 }
 

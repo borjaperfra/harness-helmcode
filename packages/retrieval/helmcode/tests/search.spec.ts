@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { RetrievalIndex, search } from '../src/index.ts'
+import { DEFAULT_WORKSPACE_ID, RetrievalIndex, search } from '../src/index.ts'
 import type { Candidate, CandidateIndex, Embedder, Reranker, SearchHit } from '../src/index.ts'
 import { failureOf } from './doubles.ts'
+
+/** La particion que usan las pruebas que no hablan de workspaces. */
+const WS = DEFAULT_WORKSPACE_ID
 
 /** Un embedder doble que registra su paso y devuelve el vector dado. */
 function embedderDouble(vector: readonly number[], order: string[]): Embedder {
@@ -123,8 +126,8 @@ describe('search', () => {
   it('funciona contra el indice real: el coseno elige, el rerank ordena', async () => {
     const index = new RetrievalIndex(':memory:')
     try {
-      index.upsertSource('docs/a.md', [{ text: 'alpha', start: 0, end: 5, embedding: [1, 0] }])
-      index.upsertSource('docs/b.md', [{ text: 'beta', start: 0, end: 4, embedding: [0, 1] }])
+      index.upsertSource(WS, 'docs/a.md', [{ text: 'alpha', start: 0, end: 5, embedding: [1, 0] }])
+      index.upsertSource(WS, 'docs/b.md', [{ text: 'beta', start: 0, end: 4, embedding: [0, 1] }])
       const embedder: Embedder = { embed: () => Promise.resolve([[1, 0]]) }
       const reranker: Reranker = {
         rerank: (_query, documents, _topN) => {
@@ -134,7 +137,10 @@ describe('search', () => {
         },
       }
 
-      const hits: SearchHit[] = await search(index, embedder, reranker, 'consulta', { topK: 3, topN: 2 })
+      // El pipeline recibe el indice acotado a un workspace, que es lo que le
+      // pasa el cableado: la particion no viaja por dentro del pipeline.
+      const scoped: CandidateIndex = { candidates: (vector, limitK) => index.candidates(WS, vector, limitK) }
+      const hits: SearchHit[] = await search(scoped, embedder, reranker, 'consulta', { topK: 3, topN: 2 })
 
       expect(hits).toEqual([
         { source: 'docs/b.md', text: 'beta', score: 0.9, index: 1 },

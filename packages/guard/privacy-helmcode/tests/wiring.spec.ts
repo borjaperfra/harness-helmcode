@@ -172,13 +172,15 @@ describe('anonymize', () => {
     expect(existsSync(`${h.mapPath}.lock`)).toBe(false)
   })
 
-  it('dice que no hay PII y no escribe mapa cuando no hay nada que redactar', async () => {
+  it('dice que no ha visto PII, sin afirmar certeza, y no escribe mapa', async () => {
     const h = await harness({ key: KEY })
     const result = await call(h, 'anonymize', { text: 'Una frase sin datos personales.' })
 
     expect(result.isError).toBe(false)
-    expect(textOf(result)).toContain('No Spanish PII was detected')
-    expect(textOf(result)).toContain('nothing was redacted')
+    // El mensaje declara lo que NO se cubre en vez de afirmar que no hay PII.
+    expect(textOf(result)).toContain('No se detectaron patrones de PII española')
+    expect(textOf(result)).toContain('no se cubren automáticamente')
+    expect(textOf(result)).not.toContain('No Spanish PII was detected')
     expect(bodyOf(result)).toBe('Una frase sin datos personales.')
     expect(existsSync(h.mapPath)).toBe(false)
   })
@@ -303,6 +305,40 @@ describe('fallo cerrado', () => {
     expect(result.isError).toBe(true)
     expect(textOf(result)).toContain('cannot read the sealed map')
     expect(textOf(result)).not.toContain(DNI)
+  })
+})
+
+describe('el seam `privacy`', () => {
+  /** El seam montado por el plugin, afirmado: sin el, la prueba no mide nada. */
+  function seamOf(ctx: Context): privacy.PrivacySeam {
+    const seam = ctx.privacy
+    if (seam === undefined) throw new Error('el plugin no monto el seam `privacy`')
+    return seam
+  }
+
+  it('redacta con el MISMO mapa y los mismos marcadores que `anonymize`', async () => {
+    const h = await harness({ key: KEY })
+
+    const throughTool = bodyOf(await call(h, 'anonymize', { text: `DNI ${DNI}.` }))
+    const throughSeam = await seamOf(h.ctx).redact(`Movil ${TEL} y DNI ${DNI}.`)
+
+    expect(throughTool).toBe('DNI [DNI_1].')
+    // El marcador del DNI es el que acuno la herramienta: un solo mapa.
+    expect(throughSeam).toBe('Movil [TEL_1] y DNI [DNI_1].')
+    expect(mapOnDisk(h.mapPath, KEY).lookup(TEL)?.placeholder).toBe('[TEL_1]')
+  })
+
+  it('falla cerrado sin credencial en vez de devolver el texto sin redactar', async () => {
+    const h = await harness({})
+
+    const outcome = await seamOf(h.ctx).redact(`DNI ${DNI}.`).then(
+      () => undefined,
+      (error: unknown) => error,
+    )
+
+    expect(outcome).toBeInstanceOf(Error)
+    expect((outcome as Error).message).toContain(`no credential is configured for ${KEY_REF}`)
+    expect(String(outcome)).not.toContain(DNI)
   })
 })
 

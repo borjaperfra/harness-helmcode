@@ -1,14 +1,33 @@
 /**
- * Detectores de PII espanola con checksum real.
+ * Detectores de PII espanola con checksum real, sobre los formatos que se
+ * escriben DE VERDAD: con puntos, guiones, barras, espacios de grupo y prefijo
+ * internacional.
  *
  * Nucleo PURO: sin `apply()`, sin `Config`, sin `ctx` y sin herramientas. Nada
  * de este fichero conoce el runtime; el cableado vive en `index.ts`.
  *
+ * La deteccion va en DOS pasos y el orden importa:
+ *
+ * 1. **Normalizacion previa, de un caracter por otro.** Punto, guion, barra y
+ *    espacio duro pasan a ser un espacio simple (el `+` del prefijo y el `:` de
+ *    una etiqueta NO son separadores de grupo y se quedan). El texto normalizado
+ *    mide EXACTAMENTE lo mismo que el original, asi que un indice hallado sobre
+ *    el normalizado sigue apuntando al mismo caracter del original.
+ * 2. **Deteccion sobre el texto normalizado**, para que `12.345.678-Z`,
+ *    `ES91 2100 ...` o `28/12345678/40` encajen con un solo patron por tipo. El
+ *    valor del hallazgo es el literal ORIGINAL recortado con esos indices —lo
+ *    que se redacta es lo que estaba escrito, no la forma normalizada— y la
+ *    validacion del checksum usa los digitos, ya sin separadores.
+ *
+ * Solo el correo se busca sobre el texto ORIGINAL: el punto es parte de su
+ * forma (`ana.perez@...`) y normalizarlo lo romperia.
+ *
  * Cada detector que afirma un checksum lo CALCULA aqui: la letra del DNI/NIE se
  * deriva del mod-23 sobre `TRWAGMYFPDXBNJZSQVHLCKE`, el IBAN se valida con el
- * mod-97 de ISO 13616, la tarjeta con el algoritmo de Luhn. Un numero que no
- * valida no es un hallazgo: preferimos perder una coincidencia antes que
- * redactar (o restaurar) un dato que no hemos verificado.
+ * mod-97 de ISO 13616, la tarjeta con el algoritmo de Luhn y el NUSS con el
+ * mod-97 de sus diez primeros digitos. Un numero que no valida no es un
+ * hallazgo: preferimos perder una coincidencia antes que redactar (o restaurar)
+ * un dato que no hemos verificado.
  *
  * Los solapes se resuelven por PRECEDENCIA —IBAN y email por delante de
  * documento, documento por delante de numero desnudo, telefono al final— y, a
@@ -63,23 +82,48 @@ const PRECEDENCE: Readonly<Record<PiiType, number>> = {
   TEL: 3,
 }
 
-/** Un DNI es 8 digitos mas la letra del mod-23 (`12345678Z`). */
-const DNI_PATTERN = /(?<![0-9A-Za-z])(\d{8})([A-Z])(?![0-9A-Za-z])/g
+/**
+ * Los separadores de grupo que la normalizacion convierte en un espacio simple:
+ * el punto (`12.345.678-Z`), el guion (`12345678-Z`), la barra
+ * (`28/12345678/40`) y el espacio duro que pegan algunos procesadores de texto.
+ */
+const GROUP_SEPARATOR_PATTERN = /[.\-/\u00A0]/gu
+
+/**
+ * Un DNI son 8 digitos mas la letra del mod-23, con espacio opcional entre los
+ * grupos de dos, tres y tres (`12345678Z`, `12345678-Z`, `12.345.678-Z`).
+ */
+const DNI_PATTERN = /(?<![0-9A-Za-z])(\d{2} ?\d{3} ?\d{3} ?[A-Z])(?![0-9A-Za-z])/g
 
 /** Un NIE es X/Y/Z (0/1/2) mas 7 digitos mas la misma letra del mod-23. */
-const NIE_PATTERN = /(?<![0-9A-Za-z])([XYZ])(\d{7})([A-Z])(?![0-9A-Za-z])/g
+const NIE_PATTERN = /(?<![0-9A-Za-z])([XYZ] ?\d{7} ?[A-Z])(?![0-9A-Za-z])/g
 
-/** Un IBAN espanol son 24 caracteres: `ES` + 2 de control + 20 digitos. */
-const IBAN_PATTERN = /(?<![0-9A-Za-z])(ES\d{22})(?![0-9A-Za-z])/g
+/**
+ * Un IBAN espanol son 24 caracteres: `ES` + 2 de control + 20 digitos. El
+ * formato real los agrupa de cuatro en cuatro, y esos espacios son del dato.
+ */
+const IBAN_PATTERN = /(?<![0-9A-Za-z])(ES\d{2}(?: ?\d{4}){5})(?![0-9A-Za-z])/g
 
-/** Una tarjeta son 13 a 19 digitos seguidos (el checksum lo pone Luhn). */
-const CARD_PATTERN = /(?<![0-9A-Za-z])(\d{13,19})(?![0-9A-Za-z])/g
+/**
+ * Una tarjeta son 13 a 19 digitos, agrupados o no de cuatro en cuatro (el
+ * checksum lo pone Luhn y el recuento de digitos se comprueba despues de quitar
+ * los espacios, porque este patron tambien encaja con tiradas de 12).
+ */
+const CARD_PATTERN = /(?<![0-9A-Za-z])(\d{4}(?: ?\d{4}){2,4}(?: ?\d{1,3})?)(?![0-9A-Za-z])/g
 
-/** El numero de la Seguridad Social (NUSS) son 12 digitos. */
-const SS_PATTERN = /(?<![0-9A-Za-z])(\d{12})(?![0-9A-Za-z])/g
+/**
+ * El numero de la Seguridad Social (NUSS) son 12 digitos en tres grupos: dos de
+ * provincia, ocho de numero y dos de control (`281234567840`,
+ * `28/12345678/40`).
+ */
+const SS_PATTERN = /(?<![0-9A-Za-z])(\d{2} ?\d{8} ?\d{2})(?![0-9A-Za-z])/g
 
-/** Un telefono espanol son 9 digitos: movil 6/7, fijo 8/9. */
-const TEL_PATTERN = /(?<![0-9A-Za-z])([6789]\d{8})(?![0-9A-Za-z])/g
+/**
+ * Un telefono espanol son 9 digitos (movil 6/7, fijo 8/9) con prefijo
+ * internacional opcional: `+34`, `0034` y el `34` desnudo, con o sin espacio
+ * detras, y con los grupos separados por un espacio.
+ */
+const TEL_PATTERN = /(?<![0-9A-Za-z])((?:\+?34 ?|0034 ?)?[6789]\d{2} ?\d{3} ?\d{3})(?![0-9A-Za-z])/g
 
 /** Un correo electronico corriente, sin espacios. */
 const EMAIL_PATTERN = /[0-9A-Za-z._%+-]+@[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*\.[A-Za-z]{2,}/g
@@ -91,8 +135,45 @@ const EMAIL_PATTERN = /[0-9A-Za-z._%+-]+@[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*\.[A-Z
  */
 const PLATE_PATTERN = /(?<![0-9A-Za-z])(\d{4})([BCDFGHJKLMNPRSTVWXYZ]{3})(?![0-9A-Za-z])/g
 
-/** El numero de historia clinica, con su etiqueta `HC-` y 4 a 9 digitos. */
-const RECORD_PATTERN = /(?<![0-9A-Za-z])(HC-\d{4,9})(?![0-9A-Za-z])/g
+/**
+ * El numero de historia clinica, con su etiqueta `HC-` (que la normalizacion
+ * deja como `HC `) o `NHC` con dos puntos, y 4 a 9 digitos.
+ */
+const RECORD_PATTERN = /(?<![0-9A-Za-z])((?:NHC|HC)(?: |: ?)\d{4,9})(?![0-9A-Za-z])/g
+
+/**
+ * Normaliza los separadores de grupo a un espacio simple, caracter por caracter.
+ *
+ * La sustitucion es 1:1 a proposito: conserva la longitud, y por eso los indices
+ * que se hallen sobre el texto normalizado valen sobre el original.
+ *
+ * @param text - el texto tal como llego.
+ * @returns el mismo texto con punto, guion, barra y espacio duro por espacio.
+ */
+function normalizeSeparators(text: string): string {
+  return text.replace(GROUP_SEPARATOR_PATTERN, ' ')
+}
+
+/**
+ * Los digitos de un valor, sin separadores ni espacios.
+ *
+ * @param value - el literal hallado.
+ * @returns solo sus digitos.
+ */
+function digitsOf(value: string): string {
+  return value.replace(/\D/g, '')
+}
+
+/**
+ * Los caracteres alfanumericos de un valor, sin separadores ni espacios: es la
+ * forma que exigen los checksums del IBAN (que lleva letras) y del documento.
+ *
+ * @param value - el literal hallado.
+ * @returns solo sus letras y digitos.
+ */
+function alphanumericOf(value: string): string {
+  return value.replace(/[^0-9A-Za-z]/g, '')
+}
 
 /**
  * Letra del mod-23 de un documento nacional.
@@ -164,45 +245,68 @@ function luhnValid(digits: string): boolean {
 }
 
 /**
+ * Valida el digito de control del NUSS: los dos ultimos digitos son el resto
+ * modulo 97 de los diez primeros, escrito con dos cifras.
+ *
+ * @param digits - los 12 digitos, sin separadores.
+ */
+function socialSecurityValid(digits: string): boolean {
+  const control = digits.slice(10)
+  return control === String(Number(digits.slice(0, 10)) % 97).padStart(2, '0')
+}
+
+/**
  * Recorre todos los patrones y devuelve los candidatos que ademas validan su
- * checksum. Los patrones ya exigen fronteras de palabra, asi que un numero
- * dentro de una tirada mas larga de digitos (el cuerpo de un IBAN, por ejemplo)
- * nunca se propone por si solo.
+ * checksum.
+ *
+ * Los patrones ya exigen fronteras de palabra, asi que un numero dentro de una
+ * tirada mas larga de digitos (el cuerpo de un IBAN, por ejemplo) nunca se
+ * propone por si solo. El valor que se guarda es el literal ORIGINAL, no el
+ * normalizado: es lo que hay que tapar y lo que el mapa guarda como clave.
  *
  * @param text - el texto en el que buscar.
  */
 function collectCandidates(text: string): PiiFinding[] {
   const candidates: PiiFinding[] = []
-  const push = (type: PiiType, value: string, start: number): void => {
-    candidates.push({ type, value, start, end: start + value.length })
+  const normalized = normalizeSeparators(text)
+  const push = (type: PiiType, match: RegExpMatchArray): void => {
+    // `matchAll` siempre declara el indice; el tipo lo trae opcional porque la
+    // misma interfaz sirve a `exec`, asi que se afirma en vez de ramificar.
+    const start = match.index as number
+    const end = start + match[0].length
+    candidates.push({ type, value: text.slice(start, end), start, end })
   }
 
-  for (const match of text.matchAll(IBAN_PATTERN)) {
-    if (ibanValid(match[1] as string)) push('IBAN', match[1] as string, match.index)
+  for (const match of normalized.matchAll(IBAN_PATTERN)) {
+    if (ibanValid(alphanumericOf(match[1] as string))) push('IBAN', match)
   }
+  // El correo se busca sobre el ORIGINAL: sus puntos son parte de la forma.
   for (const match of text.matchAll(EMAIL_PATTERN)) {
     candidates.push({ type: 'EMAIL', value: match[0], start: match.index, end: match.index + match[0].length })
   }
-  for (const match of text.matchAll(DNI_PATTERN)) {
-    if (dniValid(match[1] as string, match[2] as string)) push('DNI', match[0], match.index)
+  for (const match of normalized.matchAll(DNI_PATTERN)) {
+    const document = alphanumericOf(match[1] as string)
+    if (dniValid(document.slice(0, 8), document.slice(8))) push('DNI', match)
   }
-  for (const match of text.matchAll(NIE_PATTERN)) {
-    if (nieValid(match[1] as string, match[2] as string, match[3] as string)) push('NIE', match[0], match.index)
+  for (const match of normalized.matchAll(NIE_PATTERN)) {
+    const document = alphanumericOf(match[1] as string)
+    if (nieValid(document.charAt(0), document.slice(1, 8), document.charAt(8))) push('NIE', match)
   }
-  for (const match of text.matchAll(CARD_PATTERN)) {
-    if (luhnValid(match[1] as string)) push('CARD', match[1] as string, match.index)
+  for (const match of normalized.matchAll(CARD_PATTERN)) {
+    const digits = digitsOf(match[1] as string)
+    if (digits.length >= 13 && digits.length <= 19 && luhnValid(digits)) push('CARD', match)
   }
-  for (const match of text.matchAll(SS_PATTERN)) {
-    push('SS', match[1] as string, match.index)
+  for (const match of normalized.matchAll(SS_PATTERN)) {
+    if (socialSecurityValid(digitsOf(match[1] as string))) push('SS', match)
   }
-  for (const match of text.matchAll(PLATE_PATTERN)) {
-    push('PLATE', match[0], match.index)
+  for (const match of normalized.matchAll(PLATE_PATTERN)) {
+    push('PLATE', match)
   }
-  for (const match of text.matchAll(RECORD_PATTERN)) {
-    push('RECORD', match[1] as string, match.index)
+  for (const match of normalized.matchAll(RECORD_PATTERN)) {
+    push('RECORD', match)
   }
-  for (const match of text.matchAll(TEL_PATTERN)) {
-    push('TEL', match[1] as string, match.index)
+  for (const match of normalized.matchAll(TEL_PATTERN)) {
+    push('TEL', match)
   }
   return candidates
 }
@@ -215,7 +319,8 @@ function collectCandidates(text: string): PiiFinding[] {
  * IBAN no se declara, y una tirada de 12 digitos dentro de una tarjeta tampoco.
  *
  * @param text - el texto a inspeccionar.
- * @returns los hallazgos aceptados, ordenados por posicion.
+ * @returns los hallazgos aceptados, ordenados por posicion, con el valor
+ * literal original (con sus separadores) y los indices sobre `text`.
  */
 export function detectPii(text: string): PiiFinding[] {
   const ordered = collectCandidates(text).sort((left, right) =>

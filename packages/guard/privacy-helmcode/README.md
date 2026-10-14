@@ -58,12 +58,13 @@ This section explains how detection, mapping and sealing compose, and points at 
 
 ### Design philosophy
 
-The channel rests on four commitments:
+The channel rests on five commitments:
 
 - **Explicit capability, no interceptor.** The `llm/stream` waterfall does not allow rewriting the request the loop assembled, and there is no global content-admission hook, so redaction happens when the model calls a tool — and only then. Nothing is redacted behind the agent's back, and nothing is redacted that the agent did not route through this package.
 - **Fail closed at every step.** The key is resolved and the map is opened BEFORE the text is examined: a missing credential, an envelope that will not decrypt or a map that cannot be written fails the call instead of returning the original.
 - **Detection with real checksums.** The detectors validate the Spanish identifier formats they claim — DNI/NIE, NUSS, IBAN, CIF and the card formats — instead of matching shapes that would redact arbitrary numbers.
 - **Deterministic markers.** A value keeps its marker across sessions because the map, not the call, assigns it, and the map is the only way back.
+- **One map, two faces.** The tools redact what the model passes in; the optional `ctx.privacy` seam redacts what a consumer outside the package holds — today the retrieval `export_audit` tool, which exports the committed session log with these same markers. The seam shares the map, the key and the expiry, so a value redacted by either face carries the same marker; a consumer that finds no seam knows no map is mounted and says so instead of exporting in the clear.
 
 ### How a call is served
 

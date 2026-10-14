@@ -28,6 +28,17 @@ export type QuotaBucket = 'unlimited' | 'sota' | 'addon'
 /** La ruta de proveedor cuyo consumo pertenece a la cuota de Helmcode. */
 export const HELMCODE_PROVIDER = 'helmcode'
 
+/**
+ * La ruta que sirve los MISMOS modelos por otra puerta (en esta maquina, NaN).
+ *
+ * Su consumo no es cuota de Helmcode y por eso `bucketOf` sigue devolviendo
+ * `undefined` para ella: no hay plan al que imputarlo. El medidor la cuenta
+ * aparte, en el cubo `nan`, para que el operador vea las dos cosas sin
+ * mezclarlas. NaN no publica tabla de limites, asi que ese cubo no tiene tope:
+ * solo consumo.
+ */
+export const NAN_PROVIDER = 'nan-builders'
+
 /** Cuota mensual de un plan, en tokens. */
 export interface PlanLimits {
   /** Precio de lista en euros al mes; `null` en enterprise, que es a medida. */
@@ -117,14 +128,15 @@ export const KEY_LIMITS: KeyLimits = Object.freeze({
 })
 
 /**
- * A que cubo pertenece una llamada concreta.
+ * A que cubo de cuota pertenece una llamada concreta.
  *
  * La atribucion es por RUTA, no por identificador de modelo, y ese detalle es el
  * que evita un error caro: el mismo despliegue puede servir `deepseek-v4-flash`
  * o `glm5.3-flash` por otra ruta (en esta maquina, la ruta NaN los sirve), y
  * contarlos como cuota de Helmcode seria imputar a un plan un consumo que no es
  * suyo. Cualquier proveedor que no sea Helmcode devuelve `undefined`: no hay
- * cuota que descontar.
+ * cuota de Helmcode que descontar. La ruta NaN tiene su cubo aparte en la vista
+ * (ver {@link NAN_PROVIDER}), que es del medidor y no de esta tabla.
  *
  * @param provider - la ruta de proveedor que sirvio la llamada.
  * @param model - el identificador exacto del modelo.

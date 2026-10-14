@@ -1,24 +1,25 @@
 /**
  * Suite de CABLEADO de la recuperacion, contra un `Context` de verdad con el
- * `ToolRuntime` real: el seam `ctx.retrieval`, las dos herramientas por el
+ * `ToolRuntime` real: el seam `ctx.retrieval`, las CUATRO herramientas por el
  * pipeline de `ctx.tools`, el indice en un fichero de verdad y la clave en el
  * credential store local.
  *
  * Lo que se prueba aqui y no en el nucleo puro:
- * - el egreso declarado: las dos descripciones dicen a que API se llama;
- * - fallo cerrado: sin clave, con una referencia invalida, sin transporte global
- *   o con AUTH/CREDITS las herramientas fallan con su codigo y su causa, y no
- *   devuelven resultados;
- * - los no-ops declarados: un documento sin texto, un indice sin trozos y un
- *   perfil sin fuentes se DICEN, no se convierten en errores;
+ * - el egreso declarado: las descripciones dicen a que API se llama;
+ * - fallo cerrado: sin clave, con una referencia invalida, sin transporte global,
+ *   sin seam web o con AUTH/CREDITS las herramientas fallan con su codigo y su
+ *   causa, y no devuelven resultados;
+ * - los no-ops declarados: un documento sin texto, un indice sin trozos, un
+ *   perfil sin fuentes y una URL sin texto se DICEN, no se convierten en errores;
  * - el informe por fuente de `index_workspace`, que no revierte lo ya indexado;
- * - la lectura de las fuentes por el seam (`ctx.fs`) y la persistencia del indice
- *   entre instancias del plugin con el mismo `indexPath`.
+ * - la particion por workspace: dos proyectos con la MISMA fuente no se pisan;
+ * - `index_url` por el seam web y `export_audit` con y sin mapa de redaccion.
  *
  * NINGUNA prueba abre un socket: `globalThis.fetch` se sustituye por un doble que
  * responde a los dos endpoints (embeddings de 4096 dimensiones y rerank), se
  * restaura al terminar cada prueba y se puede cambiar entre dos llamadas, porque
- * el servicio lo lee en CADA operacion.
+ * el servicio lo lee en CADA operacion. El seam web y el de privacidad se
+ * proveen como dobles minimos en las pruebas que los necesitan.
  */
 
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -44,6 +45,9 @@ const EMBEDDING: readonly number[] = Array.from({ length: 4096 }, (_value, index
 
 /** Un parrafo de mas de un trozo: 60 repeticiones de 27 caracteres. */
 const LONG_PARAGRAPH = 'lorem ipsum dolor sit amet '.repeat(60)
+
+/** La particion de un cwd, tal como la calcula el cableado. */
+const workspaceOf = (path: string): string => retrieval.workspaceIdOf(path)
 
 let callCounter = 0
 
@@ -141,11 +145,13 @@ async function harness(options: {
   topN?: number
   withoutFs?: boolean
   transport?: TransportDouble
+  workspace?: string
 } = {}): Promise<Harness> {
   const root = mkdtempSync(join(tmpdir(), 'dsh-retrieval-'))
   roots.push(root)
   const home = join(root, 'home')
-  const workspace = join(root, 'workspace')
+  // Un workspace se puede REUTILIZAR (persistencia) o nacer con el arnes.
+  const workspace = options.workspace ?? join(root, 'workspace')
   const indexPath = options.indexPath ?? join(root, 'index.sqlite')
   mkdirSync(workspace, { recursive: true })
 
@@ -168,14 +174,32 @@ async function harness(options: {
   return { ctx, root, workspace, indexPath, transport }
 }
 
-/** Ejecuta una herramienta por el pipeline real, con o sin sesion (cwd). */
-function call(h: Harness, name: string, args: unknown, withSession = false): Promise<ToolExecutionResult> {
+/**
+ * Ejecuta una herramienta por el pipeline real, con o sin sesion (cwd).
+ *
+ * @param h - el arnes montado.
+ * @param name - nombre de la herramienta.
+ * @param args - argumentos.
+ * @param withSession - si la llamada lleva una sesion con el cwd del workspace.
+ * @param session - una sesion explicita (el log de `export_audit`), que sustituye
+ * a la del cwd.
+ */
+function call(
+  h: Harness,
+  name: string,
+  args: unknown,
+  withSession = false,
+  session?: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  const agent = session !== undefined
+    ? { session }
+    : withSession ? { session: { header: { cwd: h.workspace } } } : undefined
   return h.ctx.tools.execute({
     signal: new AbortController().signal,
     callId: ToolCallId(`call-${++callCounter}`),
     name,
     arguments: args,
-    ...(withSession ? { agent: { session: { header: { cwd: h.workspace } } } as never } : {}),
+    ...(agent === undefined ? {} : { agent: agent as never }),
   })
 }
 
@@ -191,24 +215,41 @@ function writeSource(workspace: string, name: string, text: string): void {
   writeFileSync(join(workspace, name), text)
 }
 
+/** Una sesion doble: lo unico que `export_audit` necesita de ella es su id. */
+function sessionDouble(id = 'session-1'): Record<string, unknown> {
+  return { id }
+}
+
 describe('registro de las herramientas', () => {
-  it('publica `index_workspace` y `knowledge_search`, y las dos declaran su egreso', async () => {
+  it('publica las cuatro herramientas, y las que salen a la red declaran su egreso', async () => {
     const h = await harness({ key: KEY })
     const schemas = h.ctx.tools.schemas()
     const index = schemas.find(schema => schema.name === 'index_workspace')
     const search = schemas.find(schema => schema.name === 'knowledge_search')
+    const url = schemas.find(schema => schema.name === 'index_url')
+    const audit = schemas.find(schema => schema.name === 'export_audit')
 
     expect(index).toBeDefined()
     expect(search).toBeDefined()
+    expect(url).toBeDefined()
+    expect(audit).toBeDefined()
     // El egreso se declara en la descripcion, que es lo que lee el modelo.
     expect(index?.description).toContain('https://api.helmcode.com/v1')
     expect(search?.description).toContain('https://api.helmcode.com/v1')
+    expect(url?.description).toContain('https://api.helmcode.com/v1')
     expect(index?.description).toContain('EU residency')
     expect(search?.description).toContain('EU residency')
+    expect(url?.description).toContain('EU residency')
+    // El export es local y lo dice: no hay egreso que declarar.
+    expect(audit?.description).toContain('makes no network request')
     const indexProperties = (index?.parameters as { properties?: Record<string, unknown> }).properties ?? {}
     const searchProperties = (search?.parameters as { properties?: Record<string, unknown> }).properties ?? {}
+    const urlProperties = (url?.parameters as { properties?: Record<string, unknown> }).properties ?? {}
+    const auditProperties = (audit?.parameters as { properties?: Record<string, unknown> }).properties ?? {}
     expect(Object.keys(indexProperties)).toEqual(['sources'])
     expect(Object.keys(searchProperties).sort()).toEqual(['query', 'topN'])
+    expect(Object.keys(urlProperties)).toEqual(['url', 'source'])
+    expect(Object.keys(auditProperties)).toEqual([])
   })
 
   it('rechaza un topK o un topN que no es un entero positivo', async () => {
@@ -248,8 +289,9 @@ describe('index_workspace', () => {
     expect(text).toContain('largo (')
     expect(text).toContain('4 chunk(s), 1 request(s)')
     expect(text).toContain('EU residency')
-    // El indice quedo con los cinco trozos y cada fuente gasto una peticion.
-    expect(h.ctx.retrieval.count()).toBe(5)
+    // El indice quedo con los cinco trozos EN LA PARTICION de la sesion y cada
+    // fuente gasto una peticion.
+    expect(h.ctx.retrieval.count(workspaceOf(h.workspace))).toBe(5)
     expect(h.transport.calls.filter(url => url.endsWith('/v1/embeddings'))).toHaveLength(2)
   })
 
@@ -261,7 +303,10 @@ describe('index_workspace', () => {
 
     expect(result.isError).toBe(false)
     expect(textOf(result)).toContain('Indexed 1 of 1 source(s)')
+    // Una llamada sin cwd tiene su PROPIA particion, que es la que cuenta
+    // `count()` sin argumento.
     expect(h.ctx.retrieval.count()).toBe(1)
+    expect(h.ctx.retrieval.count(workspaceOf(h.workspace))).toBe(0)
   })
 
   it('limita la indexacion con el parametro `sources` y luego completa el resto', async () => {
@@ -272,12 +317,12 @@ describe('index_workspace', () => {
     const limited = await call(h, 'index_workspace', { sources: ['b'] }, true)
     expect(limited.isError).toBe(false)
     expect(textOf(limited)).toContain('Indexed 1 of 1 source(s)')
-    expect(h.ctx.retrieval.count()).toBe(1)
+    expect(h.ctx.retrieval.count(workspaceOf(h.workspace))).toBe(1)
 
     const all = await call(h, 'index_workspace', {}, true)
     expect(all.isError).toBe(false)
     expect(textOf(all)).toContain('Indexed 2 of 2 source(s)')
-    expect(h.ctx.retrieval.count()).toBe(2)
+    expect(h.ctx.retrieval.count(workspaceOf(h.workspace))).toBe(2)
   })
 
   it('falla si el modelo nombra una fuente que el perfil no declara', async () => {
@@ -289,7 +334,7 @@ describe('index_workspace', () => {
     expect(result.isError).toBe(true)
     expect(textOf(result)).toContain('is not one of the profile')
     expect(textOf(result)).toContain('["a"]')
-    expect(h.ctx.retrieval.count()).toBe(0)
+    expect(h.ctx.retrieval.count(workspaceOf(h.workspace))).toBe(0)
   })
 
   it('un documento sin texto es un no-op declarado, no un error', async () => {
@@ -335,7 +380,7 @@ describe('index_workspace', () => {
     expect(textOf(partial)).toContain('1 failed')
     expect(textOf(partial)).toContain('roto (')
     expect(textOf(partial)).toContain(': failed')
-    expect(mixed.ctx.retrieval.count()).toBe(1)
+    expect(mixed.ctx.retrieval.count(workspaceOf(mixed.workspace))).toBe(1)
   })
 
   it('se niega a leer una ruta que no es un fichero regular', async () => {
@@ -365,12 +410,12 @@ describe('index_workspace', () => {
     expect(textOf(result)).toContain('[PROVIDER]')
     expect(textOf(result)).toContain('503')
     // Lo que ya estaba indexado sigue ahi: un fallo de API no revierte nada.
-    expect(h.ctx.retrieval.count()).toBe(1)
+    expect(h.ctx.retrieval.count(workspaceOf(h.workspace))).toBe(1)
   })
 })
 
 describe('fallo cerrado', () => {
-  it('sin credencial configurada las dos herramientas fallan con su codigo y no indexan nada', async () => {
+  it('sin credencial configurada las herramientas fallan con su codigo y no indexan nada', async () => {
     const h = await harness({ sources: { a: 'a.md' } })
     writeSource(h.workspace, 'a.md', 'Nota que no se debe indexar.')
 
@@ -456,7 +501,7 @@ describe('knowledge_search', () => {
     writeSource(h.workspace, 'b.md', `${LONG_PARAGRAPH}\n\n${LONG_PARAGRAPH}\n`)
     expect((await call(h, 'index_workspace', {}, true)).isError).toBe(false)
 
-    const result = await call(h, 'knowledge_search', { query: 'lorem ipsum', topN: 2 })
+    const result = await call(h, 'knowledge_search', { query: 'lorem ipsum', topN: 2 }, true)
 
     expect(result.isError).toBe(false)
     const text = textOf(result)
@@ -486,7 +531,7 @@ describe('knowledge_search', () => {
     expect((await call(h, 'index_workspace', {}, true)).isError).toBe(false)
     globalThis.fetch = helmcodeDouble({ rerankEmpty: true }).fetch
 
-    const result = await call(h, 'knowledge_search', { query: 'nota' })
+    const result = await call(h, 'knowledge_search', { query: 'nota' }, true)
 
     expect(result.isError).toBe(false)
     expect(textOf(result)).toContain('reranked 0 fragment(s) out of the 1 chunk(s)')
@@ -500,12 +545,42 @@ describe('knowledge_search', () => {
     // doble aqui demuestra que no hay cache de ninguno de los dos.
     globalThis.fetch = helmcodeDouble({ embedStatuses: [401] }).fetch
 
-    const result = await call(h, 'knowledge_search', { query: 'nota' })
+    const result = await call(h, 'knowledge_search', { query: 'nota' }, true)
 
     expect(result.isError).toBe(true)
     expect(textOf(result)).toContain('[AUTH]')
     expect(textOf(result)).not.toContain('Nota indexada')
     expect(result.error?.info?.code).toBe('AUTH')
+  })
+
+  it('no ve los trozos de otro workspace aunque el indice sea el mismo fichero', async () => {
+    const first = await harness({ key: KEY, sources: { manual: 'manual.md' } })
+    writeSource(first.workspace, 'manual.md', 'Manual del proyecto uno.')
+    expect((await call(first, 'index_workspace', {}, true)).isError).toBe(false)
+
+    // Mismo fichero de indice, otro cwd y la MISMA fuente: la busqueda de la
+    // segunda sesion no puede citar el manual de la primera.
+    const second = await harness({
+      key: KEY,
+      sources: { manual: 'manual.md' },
+      indexPath: first.indexPath,
+      transport: first.transport,
+    })
+    writeSource(second.workspace, 'manual.md', 'Manual del proyecto dos.')
+    expect(second.ctx.retrieval.count(workspaceOf(second.workspace))).toBe(0)
+    // La particion de la primera sigue intacta: nadie la piso.
+    expect(second.ctx.retrieval.count(workspaceOf(first.workspace))).toBe(1)
+
+    const empty = await call(second, 'knowledge_search', { query: 'manual' }, true)
+    expect(empty.isError).toBe(false)
+    expect(textOf(empty)).toContain('holds no chunks')
+
+    expect((await call(second, 'index_workspace', {}, true)).isError).toBe(false)
+    const own = await call(second, 'knowledge_search', { query: 'manual' }, true)
+    expect(own.isError).toBe(false)
+    expect(textOf(own)).toContain('Manual del proyecto dos')
+    expect(textOf(own)).not.toContain('Manual del proyecto uno')
+    expect(second.ctx.retrieval.count(workspaceOf(first.workspace))).toBe(1)
   })
 
   it('rechaza un topN que no es un entero positivo', async () => {
@@ -518,6 +593,282 @@ describe('knowledge_search', () => {
     expect(textOf(zero)).toContain('topN must be a positive integer')
     expect(huge.isError).toBe(true)
     expect(textOf(huge)).toContain('topN must be a positive integer')
+  })
+})
+
+describe('index_url', () => {
+  /** El doble del seam web: la descarga entra por aqui y no abre ningun socket. */
+  function webDouble(result: {
+    url?: string
+    statusCode?: number
+    kind?: string
+    content?: string
+    truncated?: boolean
+  } = {}) {
+    return {
+      fetch: (request: { url: string }) => Promise.resolve({
+        url: result.url ?? request.url,
+        statusCode: result.statusCode ?? 200,
+        body: { kind: result.kind ?? 'text', content: result.content ?? 'Guia con texto suficiente para trocear.' },
+        truncated: result.truncated ?? false,
+      }),
+    }
+  }
+
+  it('descarga por el seam web, trocea, indexa y lo declara', async () => {
+    const h = await harness({ key: KEY })
+    const seen: string[] = []
+    h.ctx.provide('web', {
+      fetch: (request: { url: string }) => {
+        seen.push(request.url)
+        return webDouble().fetch(request)
+      },
+    })
+
+    const result = await call(h, 'index_url', { url: 'https://ejemplo.es/guia' }, true)
+
+    expect(result.isError).toBe(false)
+    // El egreso va al seam y no a un `fetch` propio de la herramienta.
+    expect(seen).toEqual(['https://ejemplo.es/guia'])
+    expect(textOf(result)).toContain('Indexed 1 chunk(s) of https://ejemplo.es/guia as "https://ejemplo.es/guia"')
+    expect(textOf(result)).toContain('EU residency')
+    expect(h.ctx.retrieval.count(workspaceOf(h.workspace))).toBe(1)
+    expect(h.transport.calls.filter(url => url.endsWith('/v1/embeddings'))).toHaveLength(1)
+
+    const found = await call(h, 'knowledge_search', { query: 'guia' }, true)
+    expect(textOf(found)).toContain('https://ejemplo.es/guia')
+  })
+
+  it('cita el nombre logico que el modelo declara', async () => {
+    const h = await harness({ key: KEY })
+    h.ctx.provide('web', webDouble())
+
+    const result = await call(h, 'index_url', { url: 'https://ejemplo.es/guia', source: 'guia-web' }, true)
+
+    expect(result.isError).toBe(false)
+    expect(textOf(result)).toContain('as "guia-web"')
+    const found = await call(h, 'knowledge_search', { query: 'guia' }, true)
+    expect(textOf(found)).toContain('1. guia-web — score')
+  })
+
+  it('declara el cuerpo recortado por el proveedor y una URL sin texto', async () => {
+    const h = await harness({ key: KEY })
+    h.ctx.provide('web', webDouble({ truncated: true, kind: 'html' }))
+
+    const truncated = await call(h, 'index_url', { url: 'https://ejemplo.es/larga' }, true)
+    expect(truncated.isError).toBe(false)
+    expect(textOf(truncated)).toContain('content kind: html')
+    expect(textOf(truncated)).toContain('body truncated by the provider')
+
+    const empty = await harness({ key: KEY })
+    empty.ctx.provide('web', webDouble({ content: '   \n\n' }))
+    const noop = await call(empty, 'index_url', { url: 'https://ejemplo.es/vacia' }, true)
+
+    expect(noop.isError).toBe(false)
+    expect(textOf(noop)).toContain('no text to chunk')
+    expect(textOf(noop)).toContain('declared no-op')
+    // Un no-op no gasta peticiones de embeddings.
+    expect(empty.transport.calls).toEqual([])
+  })
+
+  it('un estado que no es 2xx falla con su causa en vez de indexar la pagina de error', async () => {
+    const h = await harness({ key: KEY })
+    h.ctx.provide('web', webDouble({ statusCode: 404, content: 'no encontrado' }))
+
+    const result = await call(h, 'index_url', { url: 'https://ejemplo.es/falta' }, true)
+
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toContain('404')
+    expect(textOf(result)).toContain('nothing was indexed')
+    expect(h.ctx.retrieval.count(workspaceOf(h.workspace))).toBe(0)
+    expect(h.transport.calls).toEqual([])
+  })
+
+  it('sin el seam web se niega en vez de descargar por fuera', async () => {
+    const h = await harness({ key: KEY })
+
+    const result = await call(h, 'index_url', { url: 'https://ejemplo.es/guia' }, true)
+
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toContain('web seam')
+    expect(textOf(result)).toContain('refused')
+    expect(h.transport.calls).toEqual([])
+  })
+
+  it('un AUTH de la API hace fallar la indexacion de la URL con su codigo', async () => {
+    const h = await harness({ key: KEY, transport: helmcodeDouble({ embedStatuses: [401] }) })
+    h.ctx.provide('web', webDouble())
+
+    const result = await call(h, 'index_url', { url: 'https://ejemplo.es/guia' }, true)
+
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toContain('[AUTH]')
+    expect(result.error?.info?.code).toBe('AUTH')
+    expect(h.ctx.retrieval.count(workspaceOf(h.workspace))).toBe(0)
+  })
+
+  it('sin credencial falla con su codigo y no indexa nada', async () => {
+    const h = await harness({})
+    h.ctx.provide('web', webDouble())
+
+    const result = await call(h, 'index_url', { url: 'https://ejemplo.es/guia' }, true)
+
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toContain('no credential is configured for HELMCODE_API_KEY')
+    expect(result.error?.info).toEqual({ name: 'RetrievalToolError', code: 'MISSING_CREDENTIAL' })
+    expect(h.transport.calls).toEqual([])
+  })
+})
+
+describe('export_audit', () => {
+  const DNI = '12345678Z'
+  const TEL = '612345678'
+
+  /** Un evento del log, en la forma que el exportador lee. */
+  function event(seq: number, type: string, data: unknown): Record<string, unknown> {
+    return { seq, time: 1_700_000_000_000 + seq, type, data }
+  }
+
+  /**
+   * El doble del seam de persistencia: entrega el log comprometido que se le da
+   * y anota como se abrio y si se cerro. Es el unico camino por el que el export
+   * lee la sesion, asi que aqui se ve el contrato entero.
+   */
+  function persistenceDouble(
+    events: readonly Record<string, unknown>[],
+    header: { id: string; cwd?: string },
+  ): {
+    opens: string[]
+    state: { closes: number }
+    open: (id: string, access: 'read') => Promise<{
+      header: { id: string; cwd?: string }
+      read: () => Promise<{ events: readonly Record<string, unknown>[] }>
+      close: () => Promise<void>
+    }>
+  } {
+    const opens: string[] = []
+    const state = { closes: 0 }
+    return {
+      opens,
+      state,
+      open: (id: string, access: 'read') => {
+        opens.push(`${id}/${access}`)
+        return Promise.resolve({
+          header,
+          read: () => Promise.resolve({ events }),
+          close: () => {
+            state.closes += 1
+            return Promise.resolve()
+          },
+        })
+      },
+    }
+  }
+
+  it('exporta el log comprometido en Markdown y lo redacta con el mapa montado', async () => {
+    const h = await harness({ key: KEY })
+    const texts: string[] = []
+    h.ctx.provide('privacy', {
+      redact: (text: string) => {
+        texts.push(text)
+        return Promise.resolve(text.replaceAll(DNI, '[DNI_1]').replaceAll(TEL, '[TEL_1]'))
+      },
+    })
+    const persistence = persistenceDouble([
+      event(1, 'user/message', { text: `Mi DNI es ${DNI}` }),
+      event(2, 'tool/call', { name: 'read', arguments: { file_path: 'nota.txt' }, telefono: TEL }),
+    ], { id: 'session-1', cwd: h.workspace })
+    h.ctx.provide('sessionPersistence', persistence)
+
+    const result = await call(h, 'export_audit', {}, false, sessionDouble())
+
+    expect(result.isError).toBe(false)
+    const text = textOf(result)
+    expect(text).toContain('# Session audit export')
+    expect(text).toContain('- Session: session-1')
+    expect(text).toContain(`- Workspace: ${h.workspace}`)
+    expect(text).toContain('- Events: 2')
+    expect(text).toContain('Redaction: applied through the mounted redaction map')
+    expect(text).toContain('## 1 · user/message · 2023-11-14T22:13:20.001Z')
+    expect(text).toContain('## 2 · tool/call ·')
+    expect(text).toContain('[DNI_1]')
+    expect(text).toContain('[TEL_1]')
+    // El original NO viaja: el export sale redactado o no sale.
+    expect(text).not.toContain(DNI)
+    expect(text).not.toContain(TEL)
+    // Una sola pasada por el mapa, sobre el documento entero.
+    expect(texts).toHaveLength(1)
+    expect(texts[0]).toContain('# Session audit export')
+    // El log se abre en modo lectura y el canal se cierra siempre.
+    expect(persistence.opens).toEqual(['session-1/read'])
+    expect(persistence.state.closes).toBe(1)
+  })
+
+  it('sin mapa montado DICE que no ha redactado y devuelve el log verbatim', async () => {
+    const h = await harness({ key: KEY })
+    h.ctx.provide('sessionPersistence', persistenceDouble(
+      [event(1, 'user/message', { text: `DNI ${DNI}` })],
+      { id: 'session-1', cwd: h.workspace },
+    ))
+
+    const result = await call(h, 'export_audit', {}, false, sessionDouble())
+
+    expect(result.isError).toBe(false)
+    const text = textOf(result)
+    expect(text).toContain('Redaction: NOT APPLIED')
+    expect(text).toContain('verbatim')
+    expect(text).toContain(DNI)
+  })
+
+  it('un cuerpo ausente se serializa como null y una sesion sin cwd lo declara', async () => {
+    const h = await harness({ key: KEY })
+    h.ctx.provide('sessionPersistence', persistenceDouble([event(1, 'step/end', undefined)], { id: 'session-1' }))
+
+    const result = await call(h, 'export_audit', {}, false, sessionDouble())
+
+    expect(result.isError).toBe(false)
+    const text = textOf(result)
+    expect(text).toContain('- Workspace: (unset)')
+    expect(text).toContain('```json\nnull\n```')
+  })
+
+  it('sin sesion falla en vez de exportar otra cosa', async () => {
+    const h = await harness({ key: KEY })
+
+    const result = await call(h, 'export_audit', {})
+
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toContain('carries no session')
+  })
+
+  it('sin seam de persistencia se niega en vez de leer el log por fuera', async () => {
+    const h = await harness({ key: KEY })
+
+    const result = await call(h, 'export_audit', {}, false, sessionDouble())
+
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toContain('persistence seam')
+    expect(textOf(result)).toContain('refused')
+  })
+
+  it('un mapa que no puede redactar hace fallar el export, no lo devuelve en crudo', async () => {
+    const h = await harness({ key: KEY })
+    h.ctx.provide('privacy', {
+      redact: () => Promise.reject(new Error('privacy-helmcode: cannot decrypt the sealed map')),
+    })
+    const persistence = persistenceDouble(
+      [event(1, 'user/message', { text: `DNI ${DNI}` })],
+      { id: 'session-1', cwd: h.workspace },
+    )
+    h.ctx.provide('sessionPersistence', persistence)
+
+    const result = await call(h, 'export_audit', {}, false, sessionDouble())
+
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toContain('cannot decrypt the sealed map')
+    expect(textOf(result)).not.toContain(DNI)
+    // El canal se cierra tambien cuando el export falla.
+    expect(persistence.state.closes).toBe(1)
   })
 })
 
@@ -538,6 +889,16 @@ describe('el servicio como seam', () => {
     expect((await h.ctx.retrieval.search('nota')).hits).toHaveLength(1)
   })
 
+  it('el seam acota la busqueda al workspace que le piden', async () => {
+    const h = await harness({ key: KEY })
+    await h.ctx.retrieval.indexSource('manual', 'Manual del proyecto uno.', 'ws-uno')
+
+    expect(h.ctx.retrieval.count('ws-uno')).toBe(1)
+    expect(h.ctx.retrieval.count('ws-dos')).toBe(0)
+    expect((await h.ctx.retrieval.search('manual', undefined, 'ws-dos')).indexed).toBe(0)
+    expect((await h.ctx.retrieval.search('manual', undefined, 'ws-uno')).hits).toHaveLength(1)
+  })
+
   it('resuelve el indice por defecto bajo DSH_HOME cuando el perfil no declara ruta', async () => {
     const previousHome = process.env.DSH_HOME
     const root = mkdtempSync(join(tmpdir(), 'dsh-retrieval-home-'))
@@ -551,7 +912,7 @@ describe('el servicio como seam', () => {
 
       expect(result.isError).toBe(false)
       expect(existsSync(join(root, 'retrieval', 'index.sqlite'))).toBe(true)
-      expect(h.ctx.retrieval.count()).toBe(1)
+      expect(h.ctx.retrieval.count(workspaceOf(h.workspace))).toBe(1)
     } finally {
       if (previousHome === undefined) Reflect.deleteProperty(process.env, 'DSH_HOME')
       else process.env.DSH_HOME = previousHome
@@ -570,16 +931,33 @@ describe('el servicio como seam', () => {
 })
 
 describe('persistencia entre instancias', () => {
-  it('la segunda instancia con el mismo indexPath busca en el indice de la primera', async () => {
+  it('la segunda instancia con el mismo indexPath Y el mismo workspace ve el indice de la primera', async () => {
     const first = await harness({ key: KEY, sources: { a: 'a.md' } })
     writeSource(first.workspace, 'a.md', 'Nota que sobrevive al plugin.')
     expect((await call(first, 'index_workspace', {}, true)).isError).toBe(false)
-    expect(first.ctx.retrieval.count()).toBe(1)
+    expect(first.ctx.retrieval.count(workspaceOf(first.workspace))).toBe(1)
 
-    const second = await harness({ key: KEY, sources: { a: 'a.md' }, indexPath: first.indexPath })
+    // El caso que el review senalo: la MISMA fuente en OTRO workspace del mismo
+    // fichero ya no se ve (ni se pisa); con el mismo cwd, si.
+    const second = await harness({
+      key: KEY,
+      sources: { a: 'a.md' },
+      indexPath: first.indexPath,
+      transport: first.transport,
+    })
+    expect(second.ctx.retrieval.count(workspaceOf(second.workspace))).toBe(0)
+    expect(second.ctx.retrieval.count(workspaceOf(first.workspace))).toBe(1)
 
-    expect(second.ctx.retrieval.count()).toBe(1)
-    const result = await call(second, 'knowledge_search', { query: 'nota' })
+    const sameWorkspace = await harness({
+      key: KEY,
+      sources: { a: 'a.md' },
+      indexPath: first.indexPath,
+      workspace: first.workspace,
+      transport: first.transport,
+    })
+
+    expect(sameWorkspace.ctx.retrieval.count(workspaceOf(first.workspace))).toBe(1)
+    const result = await call(sameWorkspace, 'knowledge_search', { query: 'nota' }, true)
 
     expect(result.isError).toBe(false)
     expect(textOf(result)).toContain('1. a — score')

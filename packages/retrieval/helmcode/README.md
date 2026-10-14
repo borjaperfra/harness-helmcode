@@ -1,5 +1,5 @@
 ---
-description: "Retrieval for the Helmcode layer: the pure core (chunker, qwen3-embedding embedder, reranker, local index) plus its wiring as the ctx.retrieval seam with the index_workspace and knowledge_search tools."
+description: "Retrieval for the Helmcode layer: the pure core (chunker, qwen3-embedding embedder, reranker, workspace-partitioned local index, session-audit renderer) plus its wiring as the ctx.retrieval seam with the index_workspace, index_url, knowledge_search and export_audit tools."
 kind: "package-reference"
 ---
 
@@ -7,7 +7,7 @@ kind: "package-reference"
 
 ## Summary
 
-This package gives the model answers grounded in documents the deployment names. It chunks and embeds those documents through Helmcode, stores the fragments in one SQLite index under the harness home, and ranks a query by cosine over that index before the provider reranks the candidates. The plugin declares and provides the `ctx.retrieval` seam, and publishes the two tools the model drives: `index_workspace` writes the index, `knowledge_search` reads it. There is no interceptor; nothing is indexed or retrieved unless the agent asks, and the API key is resolved before any text is touched.
+This package gives the model answers grounded in documents the deployment names. It chunks and embeds them through Helmcode, stores the fragments in one SQLite index under the harness home — partitioned by workspace, so two projects never overwrite each other — and ranks a query by cosine before the provider reranks the candidates. The plugin provides the `ctx.retrieval` seam and four tools: `index_workspace` and `index_url` write the index, `knowledge_search` reads it, and `export_audit` exports the session log with the privacy markers. Nothing is indexed or retrieved unless the agent asks.
 
 ## Table of Contents
 
@@ -48,7 +48,7 @@ Mount the plugin; the key lives in the credential store, never in the compositio
 
 ### What you get
 
-`index_workspace` answers with a per-source report — `indexed`, `empty` or `failed`, with the chunk count and a detail line — and a `401`/`402` from Helmcode fails the whole call instead of declaring a report that would invite retrying source by source. `knowledge_search` answers with the reranked fragments, each carrying the logical source name; when the index holds no fragment it says so, and when the credential is missing it fails with its own code instead of returning an empty list.
+`index_workspace` answers with a per-source report — `indexed`, `empty` or `failed`, with the chunk count and a detail line — and a `401`/`402` from Helmcode fails the whole call instead of declaring a report that would invite retrying source by source. `index_url` retrieves one URL through the web seam and indexes it under the URL or the logical name the model gives. `knowledge_search` answers with the reranked fragments, each carrying the logical source name; when the index holds no fragment it says so, and when the credential is missing it fails with its own code instead of returning an empty list. `export_audit` returns the committed session log as Markdown, header included, with the privacy map's markers applied over the whole document when that plugin is mounted and an explicit "redaction NOT applied" header when it is not.
 
 -----
 
@@ -77,7 +77,7 @@ The package is built on four commitments:
 
 | File | Role |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config`, `name`/`inject`/`apply`, the `ctx.retrieval` service and the two tools |
+| [`src/index.ts`](src/index.ts) | Plugin entry: `Config`, `name`/`inject`/`apply`, the `ctx.retrieval` service and the four tools |
 | [`src/core.ts`](src/core.ts) | The re-export surface of the pure core the package publishes |
 | [`src/chunk.ts`](src/chunk.ts) | The text chunker with its fragment offsets |
 | [`src/embed.ts`](src/embed.ts) | The Helmcode `/v1/embeddings` client for `qwen3-embedding` |
@@ -99,7 +99,7 @@ Read these pages when the package-level contract is not enough. They move from t
 
 - [Retrieval subsystem reference](../../../docs/subsystems/retrieval.md) — the `ctx.retrieval` seam, its two operations and what it deliberately does not do.
 - [Credentials subsystem reference](../../../docs/subsystems/credentials.md) — the `CredentialRef` resolution of `HELMCODE_API_KEY`.
-- [Tools subsystem reference](../../../docs/subsystems/tools.md) — the registry the two tools are published on.
+- [Tools subsystem reference](../../../docs/subsystems/tools.md) — the registry the four tools are published on.
 - [retrieval group map](../README.md) — the group this package belongs to.
 
 -----

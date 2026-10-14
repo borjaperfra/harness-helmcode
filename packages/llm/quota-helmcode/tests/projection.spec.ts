@@ -216,6 +216,88 @@ describe('estado del cubo senalado', () => {
   })
 })
 
+describe('el cubo `nan`', () => {
+  it('cuenta el consumo de la ruta NaN en su cubo, sin tocar los de Helmcode', () => {
+    const state = foldAll([
+      assistantMessage(1_000, 'nan-builders', 'deepseek-v4-flash', { inputTokens: 5_000, outputTokens: 500 }),
+    ])
+
+    expect(state.nan?.usedTokens).toBe(5_500)
+    expect(state.sota).toBeNull()
+    expect(state.addon).toBeNull()
+    expect(state.unlimited).toBeNull()
+    // La vista lo publica en su entrada propia...
+    expect(state.view.buckets).toContainEqual({ bucket: 'nan', usedTokens: 5_500 })
+    // ...y NO lo convierte en el cubo senalado: no hay plan al que imputarlo.
+    expect(state.view.bucket).toBeNull()
+    expect(state.view.usedTokens).toBe(0)
+    expect(state.view.capTokens).toBeNull()
+    expect(state.view.status).toBe('ok')
+  })
+
+  it('no mezcla los dos consumos: cada uno en su entrada y el senalado es de Helmcode', () => {
+    const state = foldAll([
+      assistantMessage(1_000, 'helmcode', 'deepseek-v4-flash', { inputTokens: 0, outputTokens: 0, totalTokens: 1_000 }),
+      // NaN gasta mucho mas, y aun asi el cubo senalado —con su tope— es el de
+      // Helmcode: el plan solo responde de lo suyo.
+      assistantMessage(2_000, 'nan-builders', 'deepseek-v4-flash', { inputTokens: 0, outputTokens: 0, totalTokens: 9_000_000 }),
+    ])
+
+    expect(state.sota?.usedTokens).toBe(1_000)
+    expect(state.nan?.usedTokens).toBe(9_000_000)
+    expect(state.view.bucket).toBe('sota')
+    expect(state.view.usedTokens).toBe(1_000)
+    expect(state.view.capTokens).toBe(PLANS[QUOTA_PLAN].sotaTokensPerMonth)
+    expect(state.view.buckets).toEqual([
+      { bucket: 'sota', usedTokens: 1_000 },
+      { bucket: 'addon', usedTokens: 0 },
+      { bucket: 'unlimited', usedTokens: 0 },
+      { bucket: 'nan', usedTokens: 9_000_000 },
+    ])
+  })
+
+  it('el cubo `nan` no tiene tope publicado: solo consumo', () => {
+    const state = foldAll([
+      assistantMessage(1_000, 'nan-builders', 'glm5.3', { inputTokens: 0, outputTokens: 0, totalTokens: 99_999_999_999 }),
+    ])
+
+    // No hay capTokens que NaN pueda agotar, y su estado no pasa de `ok`.
+    expect(state.view.capTokens).toBeNull()
+    expect(state.view.status).toBe('ok')
+    expect(state.view.buckets.find(entry => entry.bucket === 'nan')?.usedTokens).toBe(99_999_999_999)
+    expect(quotaEstimateProjectionDefinition.wire.viewSchema.safeParse(state.view).success).toBe(true)
+  })
+
+  it('las peticiones de NaN no cuentan en la tasa de rpm de la clave de Helmcode', () => {
+    const state = foldAll([
+      assistantMessage(1_000, 'helmcode', 'qwen3.6', { inputTokens: 0, outputTokens: 0, totalTokens: 1 }),
+      assistantMessage(1_100, 'nan-builders', 'qwen3.6', { inputTokens: 0, outputTokens: 0, totalTokens: 1 }),
+      assistantMessage(1_200, 'nan-builders', 'qwen3.6', { inputTokens: 0, outputTokens: 0, totalTokens: 1 }),
+    ])
+
+    // El limite de rpm es de la clave de Helmcode: la ruta NaN no la gasta.
+    expect(state.view.window.rpm).toBe(1)
+    expect(state.nan?.timestamps).toHaveLength(2)
+  })
+
+  it('la unidad valida el estado y la vista con el cubo `nan`', () => {
+    const state = foldAll([
+      assistantMessage(1_000, 'nan-builders', 'qwen3.6', { inputTokens: 0, outputTokens: 0, totalTokens: 7 }),
+    ])
+
+    expect(quotaEstimateProjectionDefinition.stateSchema.safeParse(state).success).toBe(true)
+    // El cubo es una lista cerrada: un valor fuera de la tabla no pasa.
+    const unknownBucket = {
+      ...state.view,
+      buckets: [{ bucket: 'openai', usedTokens: 1 }],
+    }
+    expect(quotaEstimateProjectionDefinition.wire.viewSchema.safeParse(unknownBucket).success).toBe(false)
+    // Y el estado exige la entrada `nan`: un estado sin ella no es de esta version.
+    const { nan: _omitted, ...withoutNan } = state
+    expect(quotaEstimateProjectionDefinition.stateSchema.safeParse(withoutNan).success).toBe(false)
+  })
+})
+
 describe('la unidad de proyeccion', () => {
   it('declara su clave, su version y publica la vista por el cable', () => {
     expect(quotaEstimateProjectionDefinition.key).toBe('quotaEstimate')

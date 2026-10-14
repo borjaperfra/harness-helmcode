@@ -3,11 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/retrieval.md
 /retrieval-helmcode:
-  en: fd83e58f77a71365
-  es: 520c46a8a86b8f9c
+  en: 175503753bb0fde5
+  es: f68ea5552e3dccd4
 /retrieval-helmcode/operations:
-  en: 14665e6f1b28cdaf
-  es: fda3f6c9a9523be4
+  en: 5e6d19be4717e709
+  es: e96f55310223bd87
 /retrieval-helmcode/what-it-does-not-do:
   en: 2e0000f10e0be75f
   es: 02234fe55f432ebd

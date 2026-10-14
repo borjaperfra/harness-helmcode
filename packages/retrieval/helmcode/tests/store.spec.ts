@@ -2,9 +2,12 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { cosineSimilarity, RetrievalError, RetrievalIndex } from '../src/index.ts'
+import { DEFAULT_WORKSPACE_ID, cosineSimilarity, RetrievalError, RetrievalIndex } from '../src/index.ts'
 import type { IndexChunk } from '../src/index.ts'
 import { thrownBy } from './doubles.ts'
+
+/** La particion que usan las pruebas que no hablan de workspaces. */
+const WS = DEFAULT_WORKSPACE_ID
 
 /** Un trozo con un vector dado. */
 function chunk(text: string, embedding: readonly number[], start = 0): IndexChunk {
@@ -34,13 +37,13 @@ describe('RetrievalIndex', () => {
   it('guarda trozos y ordena candidatos por coseno', () => {
     const index = new RetrievalIndex(':memory:')
     try {
-      index.upsertSource('docs/a.md', [chunk('alpha', [1, 0]), chunk('beta', [0, 1], 5)])
-      index.upsertSource('docs/b.md', [chunk('gamma', [1, 1])])
+      index.upsertSource(WS, 'docs/a.md', [chunk('alpha', [1, 0]), chunk('beta', [0, 1], 5)])
+      index.upsertSource(WS, 'docs/b.md', [chunk('gamma', [1, 1])])
 
-      expect(index.count()).toBe(3)
-      expect(index.sources()).toEqual(['docs/a.md', 'docs/b.md'])
+      expect(index.count(WS)).toBe(3)
+      expect(index.sources(WS)).toEqual(['docs/a.md', 'docs/b.md'])
 
-      const candidates = index.candidates([1, 0], 10)
+      const candidates = index.candidates(WS, [1, 0], 10)
       expect(candidates.map(candidate => candidate.text)).toEqual(['alpha', 'gamma', 'beta'])
       expect(candidates[0]).toEqual({ source: 'docs/a.md', position: 0, text: 'alpha', score: 1 })
       expect(candidates[2]!.score).toBe(0)
@@ -53,8 +56,8 @@ describe('RetrievalIndex', () => {
   it('respeta el limite de candidatos', () => {
     const index = new RetrievalIndex(':memory:')
     try {
-      index.upsertSource('a', [chunk('uno', [1, 0]), chunk('dos', [0.5, 0.5]), chunk('tres', [0, 1])])
-      expect(index.candidates([1, 0], 2)).toHaveLength(2)
+      index.upsertSource(WS, 'a', [chunk('uno', [1, 0]), chunk('dos', [0.5, 0.5]), chunk('tres', [0, 1])])
+      expect(index.candidates(WS, [1, 0], 2)).toHaveLength(2)
     } finally {
       index.close()
     }
@@ -63,14 +66,14 @@ describe('RetrievalIndex', () => {
   it('reemplaza los trozos de un documento al reindexarlo', () => {
     const index = new RetrievalIndex(':memory:')
     try {
-      index.upsertSource('a', [chunk('uno', [1, 0]), chunk('dos', [0, 1]), chunk('tres', [1, 1])])
-      expect(index.count()).toBe(3)
+      index.upsertSource(WS, 'a', [chunk('uno', [1, 0]), chunk('dos', [0, 1]), chunk('tres', [1, 1])])
+      expect(index.count(WS)).toBe(3)
 
-      index.upsertSource('a', [chunk('uno reescrito', [1, 0])])
+      index.upsertSource(WS, 'a', [chunk('uno reescrito', [1, 0])])
 
-      expect(index.count()).toBe(1)
-      expect(index.sources()).toEqual(['a'])
-      expect(index.candidates([1, 0], 5)[0]!.text).toBe('uno reescrito')
+      expect(index.count(WS)).toBe(1)
+      expect(index.sources(WS)).toEqual(['a'])
+      expect(index.candidates(WS, [1, 0], 5)[0]!.text).toBe('uno reescrito')
     } finally {
       index.close()
     }
@@ -79,13 +82,13 @@ describe('RetrievalIndex', () => {
   it('elimina un documento con todos sus trozos', () => {
     const index = new RetrievalIndex(':memory:')
     try {
-      index.upsertSource('a', [chunk('uno', [1, 0]), chunk('dos', [0, 1])])
-      index.upsertSource('b', [chunk('tres', [1, 1])])
+      index.upsertSource(WS, 'a', [chunk('uno', [1, 0]), chunk('dos', [0, 1])])
+      index.upsertSource(WS, 'b', [chunk('tres', [1, 1])])
 
-      expect(index.removeSource('a')).toBe(2)
-      expect(index.count()).toBe(1)
-      expect(index.sources()).toEqual(['b'])
-      expect(index.removeSource('no-existe')).toBe(0)
+      expect(index.removeSource(WS, 'a')).toBe(2)
+      expect(index.count(WS)).toBe(1)
+      expect(index.sources(WS)).toEqual(['b'])
+      expect(index.removeSource(WS, 'no-existe')).toBe(0)
     } finally {
       index.close()
     }
@@ -94,8 +97,8 @@ describe('RetrievalIndex', () => {
   it('rechaza un vector que no mide lo que el indice', () => {
     const index = new RetrievalIndex(':memory:')
     try {
-      index.upsertSource('a', [chunk('uno', [1, 0])])
-      const error = thrownBy(() => index.candidates([1, 0, 0], 1))
+      index.upsertSource(WS, 'a', [chunk('uno', [1, 0])])
+      const error = thrownBy(() => index.candidates(WS, [1, 0, 0], 1))
       expect(error.code).toBe('DIMENSION')
       expect(error.message).toContain('"a"')
     } finally {
@@ -108,13 +111,13 @@ describe('RetrievalIndex', () => {
     const path = join(directory, 'index.sqlite')
     try {
       const first = new RetrievalIndex(path)
-      first.upsertSource('docs/a.md', [chunk('alpha', [1, 0]), chunk('beta', [0, 1], 5)])
+      first.upsertSource(WS, 'docs/a.md', [chunk('alpha', [1, 0]), chunk('beta', [0, 1], 5)])
       first.close()
 
       const second = new RetrievalIndex(path)
-      expect(second.count()).toBe(2)
-      expect(second.sources()).toEqual(['docs/a.md'])
-      expect(second.candidates([0, 1], 1)[0]!.text).toBe('beta')
+      expect(second.count(WS)).toBe(2)
+      expect(second.sources(WS)).toEqual(['docs/a.md'])
+      expect(second.candidates(WS, [0, 1], 1)[0]!.text).toBe('beta')
       second.close()
     } finally {
       await rm(directory, { recursive: true, force: true })
@@ -126,8 +129,81 @@ describe('RetrievalIndex', () => {
     index.close()
     index.close()
 
+    // Sin argumento, el recuento mira la particion de las llamadas sin cwd: un
+    // indice cerrado se niega igual.
     const error = thrownBy(() => index.count())
     expect(error).toBeInstanceOf(RetrievalError)
     expect(error.code).toBe('CLOSED')
+  })
+
+  it('la particion por defecto es la de las llamadas sin cwd', () => {
+    const index = new RetrievalIndex(':memory:')
+    try {
+      index.upsertSource(DEFAULT_WORKSPACE_ID, 'suelta.md', [chunk('sin sesion', [1, 0])])
+
+      expect(index.count()).toBe(1)
+      expect(index.sources()).toEqual(['suelta.md'])
+      expect(index.candidates(DEFAULT_WORKSPACE_ID, [1, 0], 1)[0]!.text).toBe('sin sesion')
+    } finally {
+      index.close()
+    }
+  })
+})
+
+describe('RetrievalIndex: aislamiento entre workspaces', () => {
+  it('dos workspaces con la MISMA fuente no se pisan', () => {
+    const index = new RetrievalIndex(':memory:')
+    try {
+      // El caso del review: un manual en cada proyecto. Con la clave vieja
+      // `(source, position)` el segundo pisaba al primero.
+      index.upsertSource('ws-uno', 'manual', [chunk('manual del proyecto uno', [1, 0])])
+      index.upsertSource('ws-dos', 'manual', [chunk('manual del proyecto dos', [0, 1])])
+
+      expect(index.count('ws-uno')).toBe(1)
+      expect(index.count('ws-dos')).toBe(1)
+      expect(index.candidates('ws-uno', [1, 0], 5).map(candidate => candidate.text))
+        .toEqual(['manual del proyecto uno'])
+      expect(index.candidates('ws-dos', [0, 1], 5).map(candidate => candidate.text))
+        .toEqual(['manual del proyecto dos'])
+      // La fuente se cita sin la particion: el modelo ve `manual`, no un hash.
+      expect(index.sources('ws-uno')).toEqual(['manual'])
+    } finally {
+      index.close()
+    }
+  })
+
+  it('reindexar un workspace no borra los trozos del otro', () => {
+    const index = new RetrievalIndex(':memory:')
+    try {
+      index.upsertSource('ws-uno', 'manual', [chunk('viejo uno', [1, 0]), chunk('viejo dos', [0, 1])])
+      index.upsertSource('ws-dos', 'manual', [chunk('manual dos', [0, 1])])
+
+      index.upsertSource('ws-uno', 'manual', [chunk('reescrito', [1, 0])])
+      expect(index.removeSource('ws-dos', 'manual')).toBe(1)
+
+      expect(index.count('ws-uno')).toBe(1)
+      expect(index.candidates('ws-uno', [1, 0], 5)[0]!.text).toBe('reescrito')
+      expect(index.count('ws-dos')).toBe(0)
+    } finally {
+      index.close()
+    }
+  })
+
+  it('la busqueda de un workspace vacio no ve los trozos del otro', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'dsh-retrieval-'))
+    const path = join(directory, 'index.sqlite')
+    try {
+      const first = new RetrievalIndex(path)
+      first.upsertSource('ws-uno', 'manual', [chunk('solo del uno', [1, 0])])
+      first.close()
+
+      const second = new RetrievalIndex(path)
+      expect(second.count('ws-uno')).toBe(1)
+      expect(second.count('ws-dos')).toBe(0)
+      expect(second.candidates('ws-dos', [1, 0], 5)).toEqual([])
+      second.close()
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
   })
 })

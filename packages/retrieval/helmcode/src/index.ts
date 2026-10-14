@@ -1,7 +1,8 @@
 /**
  * La recuperacion de Helmcode como capacidad del agente: el seam `ctx.retrieval`,
- * que este plugin declara y provee, y las dos herramientas con las que el modelo
- * lo usa.
+ * que este plugin declara y provee, y las cuatro herramientas con las que el
+ * modelo lo usa (`index_workspace`, `index_url`, `knowledge_search` y
+ * `export_audit`).
  *
  * El nucleo puro —troceador, embedder, reranker, indice local y pipeline— vive en
  * los otros modulos del paquete y se reexporta desde `./core.ts`; este fichero es
@@ -21,7 +22,9 @@
  *    sin texto y un indice sin trozos son no-ops DECLARADOS, no errores.
  *
  * El indice vive en `<DSH_HOME>/retrieval/index.sqlite` por defecto y se abre
- * perezosamente: un perfil que nunca indexa no crea el fichero.
+ * perezosamente: un perfil que nunca indexa no crea el fichero. Sus filas se
+ * particionan por el HASH del cwd de la sesion (ver `./workspace.ts`), asi que
+ * dos proyectos que declaren la misma fuente no se pisan.
  *
  * @module @deepseek-ai/dsh-retrieval-helmcode
  */
@@ -38,6 +41,7 @@ import { HarnessError } from '@deepseek-ai/dsh-llm'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
 import z from '@deepseek-ai/schemastery'
+import { renderAuditMarkdown, type AuditEntry, type AuditRedactor } from './audit.ts'
 import { chunkText } from './chunk.ts'
 import { HelmcodeEmbedder } from './embed.ts'
 import type { Embedding } from './embed.ts'
@@ -49,6 +53,7 @@ import { HelmcodeReranker } from './rerank.ts'
 import { search as runRetrievalSearch } from './search.ts'
 import type { SearchHit } from './search.ts'
 import { RetrievalIndex } from './store.ts'
+import { DEFAULT_WORKSPACE_ID, workspaceIdOf } from './workspace.ts'
 
 export * from './core.ts'
 
@@ -199,6 +204,151 @@ export interface RetrievalServiceOptions {
   readonly topN: number
 }
 
+/**
+ * El contrato minimo que `export_audit` necesita del seam de privacidad
+ * (`ctx.privacy`), en su forma mas pequena: una funcion que tapa un texto.
+ *
+ * El tipo lo declara el PRODUCTOR (`@deepseek-ai/dsh-privacy-helmcode`, que lo
+ * provee con su mapa sellado); aqui se lee de forma estructural para no atar la
+ * recuperacion a ese paquete: si el plugin no esta montado, `ctx.get('privacy')`
+ * devuelve `undefined` y el export lo DICE en su cabecera en vez de fingir una
+ * redaccion que no ocurrio.
+ */
+export interface PrivacyRedactorSeam {
+  /**
+   * Redacta un texto contra el mapa montado.
+   *
+   * @param text - el texto original.
+   * @returns el texto con los marcadores estables del mapa.
+   */
+  redact(text: string): Promise<string>
+}
+
+/** Lo que devuelve el seam web para una URL, en su forma minima. */
+export interface WebFetchOutcome {
+  /** La URL final, ya resueltas las redirecciones permitidas. */
+  readonly url: string
+  /** El estado HTTP del recurso. */
+  readonly statusCode: number
+  /** El cuerpo decodificado y su clase de contenido. */
+  readonly body: {
+    /** `html`, `text` o lo que el proveedor haya clasificado. */
+    readonly kind: string
+    /** El cuerpo ya decodificado. */
+    readonly content: string
+  }
+  /** Si el proveedor recorto el cuerpo. */
+  readonly truncated: boolean
+}
+
+/**
+ * El contrato minimo que `index_url` necesita del seam web (`ctx.web`): descargar
+ * una URL sin abrir un socket por fuera del seam.
+ *
+ * El tipo lo declara el PRODUCTOR (`@deepseek-ai/dsh-web`); aqui se lee de forma
+ * estructural por la misma razon que el de privacidad: el transporte tiene un
+ * solo dueno, y esta herramienta no gana un camino propio a la red.
+ */
+export interface WebFetchSeam {
+  /**
+   * Descarga una URL.
+   *
+   * @param request - la URL pedida.
+   * @param signal - la cancelacion de la llamada.
+   * @returns el recurso descargado, con su estado y su cuerpo.
+   */
+  fetch(request: { readonly url: string }, signal?: AbortSignal): Promise<WebFetchOutcome>
+}
+
+/**
+ * El contrato minimo que `export_audit` necesita del seam de persistencia de
+ * sesiones (`ctx.sessionPersistence`): abrir el log COMPROMETIDO de una sesion y
+ * leerlo entero.
+ *
+ * El tipo lo declara el PRODUCTOR (`@deepseek-ai/dsh-session-persistence`); aqui
+ * se lee de forma estructural para no atar la recuperacion a ese paquete. Es la
+ * via vigente para exportar un log: la lectura sincrona del historial
+ * (`session.snapshotEvents`) esta deprecada y no se usa desde codigo de
+ * produccion.
+ */
+export interface SessionLogSeam {
+  /**
+   * Abre el log de una sesion para leerlo.
+   *
+   * @param id - identificador de la sesion.
+   * @param access - `read`: este export nunca escribe.
+   * @param options - la cancelacion de la llamada.
+   * @returns el canal de lectura del log.
+   */
+  open(
+    id: string,
+    access: 'read',
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<SessionLogHandle>
+}
+
+/** Un canal de lectura del log de una sesion, en su forma minima. */
+export interface SessionLogHandle {
+  /** La cabecera almacenada: la sesion y su workspace. */
+  readonly header: { readonly id: string; readonly cwd?: string }
+  /**
+   * Lee un tramo del log comprometido.
+   *
+   * @param offset - primer evento; 0 es el principio.
+   * @param length - cuantos eventos como maximo; `undefined`, todos.
+   * @param options - la cancelacion de la llamada.
+   * @returns los eventos del tramo.
+   */
+  read(
+    offset?: number,
+    length?: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<{ readonly events: readonly AuditEntry[] }>
+  /** Cierra el canal; es idempotente. */
+  close(): Promise<void>
+}
+
+/**
+ * El redactor del mapa de privacidad, si ese plugin esta montado.
+ *
+ * Se lee en CADA llamada: el plugin puede montarse despues que este, y
+ * `ctx.get` solo devuelve implementaciones cuyo dueno esta activo.
+ *
+ * @param ctx - contexto del plugin.
+ * @returns la funcion de redaccion, o `undefined` sin mapa montado.
+ */
+function privacyRedactor(ctx: Context): AuditRedactor | undefined {
+  // `ctx.get` devuelve `unknown` para un nombre que este paquete no declara: el
+  // tipo del seam lo declara quien lo provee. Si el nombre lo proveyera otra
+  // cosa, la llamada al redactor falla y el export NO sale en crudo.
+  const seam: unknown = ctx.get('privacy')
+  if (seam === undefined) return undefined
+  const redactor = seam as PrivacyRedactorSeam
+  return (text: string) => redactor.redact(text)
+}
+
+/**
+ * El seam web, si la composicion lo monta.
+ *
+ * @param ctx - contexto del plugin.
+ * @returns el seam de descarga, o `undefined` sin seam montado.
+ */
+function webFetchSeam(ctx: Context): WebFetchSeam | undefined {
+  const seam: unknown = ctx.get('web')
+  return seam as WebFetchSeam | undefined
+}
+
+/**
+ * El seam de persistencia de sesiones, si la composicion lo monta.
+ *
+ * @param ctx - contexto del plugin.
+ * @returns el seam de lectura del log, o `undefined` sin seam montado.
+ */
+function sessionLogSeam(ctx: Context): SessionLogSeam | undefined {
+  const seam: unknown = ctx.get('sessionPersistence')
+  return seam as SessionLogSeam | undefined
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     retrieval: RetrievalService
@@ -233,37 +383,42 @@ export class RetrievalService extends Service {
   }
 
   /**
-   * Cuantos trozos guarda el indice local.
+   * Cuantos trozos guarda el indice local de un workspace.
    *
-   * @returns el total de trozos indexados; 0 cuando aun no se ha indexado nada.
+   * @param workspace - particion del workspace (ver `./workspace.ts`); ausente,
+   * la de las llamadas sin cwd.
+   * @returns el total de trozos indexados en esa particion; 0 cuando aun no se
+   * ha indexado nada ahi.
    */
-  count(): number {
-    return this.openIndex().count()
+  count(workspace: string = DEFAULT_WORKSPACE_ID): number {
+    return this.openIndex().count(workspace)
   }
 
   /**
-   * Trocea, embebe y guarda un documento en el indice local.
+   * Trocea, embebe y guarda un documento en el indice local de un workspace.
    *
-   * El documento se REEMPLAZA entero: reindexar un fichero editado no deja sus
-   * trozos viejos compitiendo en la busqueda. Un documento sin texto utilizable es
-   * un no-op declarado —no se embebe nada, no se toca el indice y no se gasta
-   * ninguna peticion—, y la clave se resuelve ANTES de mirar el texto: sin clave
-   * esta operacion falla en vez de fingir que indexo.
+   * El documento se REEMPLAZA entero DENTRO de su particion: reindexar un
+   * fichero editado no deja sus trozos viejos compitiendo en la busqueda, y no
+   * toca la fuente del mismo nombre en otro workspace. Un documento sin texto
+   * utilizable es un no-op declarado —no se embebe nada, no se toca el indice y
+   * no se gasta ninguna peticion—, y la clave se resuelve ANTES de mirar el
+   * texto: sin clave esta operacion falla en vez de fingir que indexo.
    *
    * @param source - nombre logico del documento, el que la busqueda cita.
    * @param text - el documento completo.
+   * @param workspace - particion del workspace; ausente, la de las llamadas sin cwd.
    * @returns los trozos guardados y las peticiones enviadas a Helmcode.
    * @throws {RetrievalToolError} MISSING_CREDENTIAL sin clave utilizable,
    * NO_TRANSPORT sin `globalThis.fetch`, o el codigo del nucleo (AUTH, CREDITS,
    * RATE_LIMIT, PROVIDER, MALFORMED, DIMENSION) cuando Helmcode rechaza la llamada.
    */
-  async indexSource(source: string, text: string): Promise<SourceIndexOutcome> {
+  async indexSource(source: string, text: string, workspace: string = DEFAULT_WORKSPACE_ID): Promise<SourceIndexOutcome> {
     const apiKey = await this.resolveApiKey()
     const chunks = chunkText(text)
     if (chunks.length === 0) return { chunks: 0, requests: 0 }
     const counter: RequestCounter = { requests: 0 }
     const embeddings = await this.embedder(apiKey, counter).embed(chunks.map(chunk => chunk.text))
-    this.openIndex().upsertSource(source, chunks.map((chunk, position) => ({
+    this.openIndex().upsertSource(workspace, source, chunks.map((chunk, position) => ({
       text: chunk.text,
       start: chunk.start,
       end: chunk.end,
@@ -276,26 +431,30 @@ export class RetrievalService extends Service {
   }
 
   /**
-   * Ejecuta `embed → coseno → rerank` sobre el indice local.
+   * Ejecuta `embed → coseno → rerank` sobre el indice local de un workspace.
    *
-   * Sin trozos indexados no hay recuperacion que hacer y no se manda nada: se
-   * DICE. Con trozos, la clave se resuelve antes de embeber la consulta, asi que
-   * un fallo de credencial sale como fallo y nunca como una lista vacia.
+   * Sin trozos indexados en esa particion no hay recuperacion que hacer y no se
+   * manda nada: se DICE. Con trozos, la clave se resuelve antes de embeber la
+   * consulta, asi que un fallo de credencial sale como fallo y nunca como una
+   * lista vacia.
    *
    * @param query - la consulta del usuario.
    * @param topN - cuantos resultados devolver; ausente, el `topN` de la configuracion.
-   * @returns los trozos que tenia el indice y los resultados reranqueados.
+   * @param workspace - particion del workspace; ausente, la de las llamadas sin cwd.
+   * @returns los trozos que tenia esa particion y los resultados reranqueados.
    * @throws {RetrievalToolError} MISSING_CREDENTIAL sin clave utilizable,
    * NO_TRANSPORT sin `globalThis.fetch`, o el codigo del nucleo cuando Helmcode
    * rechaza la llamada.
    */
-  async search(query: string, topN?: number): Promise<SearchOutcome> {
+  async search(query: string, topN?: number, workspace: string = DEFAULT_WORKSPACE_ID): Promise<SearchOutcome> {
     const apiKey = await this.resolveApiKey()
     const index = this.openIndex()
-    const indexed = index.count()
+    const indexed = index.count(workspace)
     if (indexed === 0) return { indexed: 0, hits: [] }
     const hits = await runRetrievalSearch(
-      index,
+      // La particion se fija aqui: el pipeline pide candidatos sin saber de
+      // workspaces, y el indice de disco es uno por perfil.
+      { candidates: (vector, limitK) => index.candidates(workspace, vector, limitK) },
       this.embedder(apiKey, { requests: 0 }),
       this.reranker(apiKey),
       query,
@@ -590,6 +749,9 @@ export function apply(ctx: Context, config: Config = {}): void {
       }
       const targets = resolveTargets(effective.sources, args.sources)
       const cwd = exec.agent?.session.header.cwd
+      // La particion sale del cwd de la sesion: dos proyectos con el mismo
+      // nombre de fuente no comparten fila en el indice.
+      const workspace = workspaceIdOf(cwd)
       const rows: SourceRow[] = []
       for (const [source, relative] of targets) {
         let path = relative
@@ -606,7 +768,7 @@ export function apply(ctx: Context, config: Config = {}): void {
           continue
         }
         try {
-          const outcome = await service.indexSource(source, text)
+          const outcome = await service.indexSource(source, text, workspace)
           rows.push(outcome.chunks === 0
             ? {
               source, path, status: 'empty', chunks: 0, requests: 0,
@@ -716,10 +878,11 @@ export function apply(ctx: Context, config: Config = {}): void {
         return [{ type: 'text', text: lines.join('\n') }]
       },
     },
-    async execute(args, _exec: ToolExecution) {
+    async execute(args, exec: ToolExecution) {
       const topN = args.topN === undefined ? undefined : requirePositiveInteger('topN', args.topN)
+      const workspace = workspaceIdOf(exec.agent?.session.header.cwd)
       try {
-        const outcome = await service.search(args.query, topN)
+        const outcome = await service.search(args.query, topN, workspace)
         return {
           indexed: outcome.indexed,
           hits: outcome.hits.map(hit => ({ source: hit.source, score: hit.score, text: hit.text })),
@@ -730,4 +893,159 @@ export function apply(ctx: Context, config: Config = {}): void {
       }
     },
   }))
+
+  ctx.tools.register(defineTool({
+    name: 'index_url',
+    description:
+      'Fetch one URL through the web seam (ctx.web), chunk its content by paragraph and index it into the local '
+      + 'retrieval index under the URL (or under `source`), so `knowledge_search` can find it. EGRESS: the download '
+      + 'goes through the web provider this composition mounts, and every chunk is sent to the Helmcode embeddings '
+      + 'endpoint at https://api.helmcode.com/v1 (model qwen3-embedding, EU residency). Fail-closed: without the web '
+      + 'seam, without a usable key in the credential store, or when the URL does not answer 2xx, this tool fails '
+      + 'with the cause instead of indexing nothing quietly; a resource with no text is a declared no-op.',
+    parameters: {
+      url: {
+        type: 'string',
+        required: true,
+        description: 'The URL to retrieve and index; it is fetched through the web seam, never directly.',
+      },
+      source: {
+        type: 'string',
+        description: 'Logical name the index cites for this document; omit to use the final URL.',
+      },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          url: { type: 'string', required: true },
+          source: { type: 'string', required: true },
+          kind: { type: 'string', required: true },
+          chunks: { type: 'integer', required: true },
+          requests: { type: 'integer', required: true },
+          truncated: { type: 'boolean', required: true },
+        },
+      },
+      render(_args, value) {
+        // Presupuesto de acento (brandbook): el informe es TEXTO PLANO y no gasta
+        // ningun momento indigo. Un corte que lo estilice pone la URL y los
+        // contadores en `accent-text` o en gris, nunca en el indigo base, y
+        // mantiene el acento fuera del texto de cuerpo.
+        if (value.chunks === 0) {
+          return [{
+            type: 'text',
+            text: `Fetched ${value.url} (${value.kind}) through the web seam, but it has no text to chunk, so `
+              + 'nothing was embedded and the index was not touched: a declared no-op.',
+          }]
+        }
+        return [{
+          type: 'text',
+          text: `Indexed ${String(value.chunks)} chunk(s) of ${value.url} as "${value.source}" in `
+            + `${String(value.requests)} request(s) to Helmcode at ${effective.baseURL} (EU residency; content kind: `
+            + `${value.kind}${value.truncated ? ', body truncated by the provider' : ''}).`,
+        }]
+      },
+    },
+    async execute(args: IndexUrlArgs, exec: ToolExecution) {
+      const web = webFetchSeam(ctx)
+      if (web === undefined) {
+        throw new Error(
+          'retrieval-helmcode: index_url retrieves through the web seam (ctx.web), which this composition does not '
+          + 'mount; the download is refused rather than done outside the seam',
+        )
+      }
+      const fetched = await web.fetch({ url: args.url }, exec.signal)
+      if (fetched.statusCode < 200 || fetched.statusCode >= 300) {
+        throw new Error(
+          `retrieval-helmcode: ${args.url} answered ${String(fetched.statusCode)}, so nothing was indexed; `
+          + 'index_url indexes a retrieved resource, not an error page',
+        )
+      }
+      const source = args.source ?? fetched.url
+      const workspace = workspaceIdOf(exec.agent?.session.header.cwd)
+      const outcome = await service.indexSource(source, fetched.body.content, workspace).catch((error: unknown) => {
+        // El fallo del nucleo sale con su codigo, igual que en `index_workspace`:
+        // un 401/402 no es "esta URL", es la clave entera.
+        if (error instanceof RetrievalError) throw asToolFailure(error)
+        throw error
+      })
+      return {
+        url: fetched.url,
+        source,
+        kind: fetched.body.kind,
+        chunks: outcome.chunks,
+        requests: outcome.requests,
+        truncated: fetched.truncated,
+      } satisfies IndexUrlValue
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'export_audit',
+    description:
+      'Export this session log as Markdown, with the personal data replaced by the stable placeholders of the '
+      + 'privacy map (`anonymize` map) when that plugin is mounted: the redaction is applied to the whole document, '
+      + 'so tool arguments and messages come out marked as [DNI_1] instead of in the clear. Local only: this tool '
+      + 'reads the committed session log through the persistence seam (ctx.sessionPersistence) and makes no network '
+      + 'request. It declares what it does not do: without a mounted map the header says the redaction was NOT '
+      + 'applied and the body is verbatim, and a session-less or persistence-less call fails instead of exporting '
+      + 'something else.',
+    parameters: {},
+    output: {
+      schema: { type: 'string' },
+      // Presupuesto de acento (brandbook): el Markdown sale como TEXTO PLANO y no
+      // gasta momentos indigo. El encabezado y los nombres de evento son el
+      // contenido, no decoracion: un corte que los estilice usa `accent-text` o
+      // gris, nunca el indigo base, y no mete acento en el cuerpo del log.
+      render: (_args, value) => [{ type: 'text', text: value }],
+    },
+    async execute(_args: ExportAuditArgs, exec: ToolExecution) {
+      const session = exec.agent?.session
+      if (session === undefined) {
+        throw new Error(
+          'retrieval-helmcode: export_audit exports the session log, and this call carries no session, so there is '
+          + 'nothing to export',
+        )
+      }
+      const seam = sessionLogSeam(ctx)
+      if (seam === undefined) {
+        throw new Error(
+          'retrieval-helmcode: export_audit reads the committed log through the persistence seam '
+          + '(ctx.sessionPersistence), which this composition does not mount; the export is refused rather than '
+          + 'read outside the seam',
+        )
+      }
+      const handle = await seam.open(session.id, 'read', { signal: exec.signal })
+      try {
+        const { events } = await handle.read(0, undefined, { signal: exec.signal })
+        return await renderAuditMarkdown(
+          { id: handle.header.id, cwd: handle.header.cwd },
+          events,
+          privacyRedactor(ctx),
+        )
+      } finally {
+        await handle.close()
+      }
+    },
+  }))
 }
+
+/** Los argumentos validados de `index_url`. */
+interface IndexUrlArgs {
+  readonly url: string
+  readonly source?: string
+}
+
+/** El valor canonico de `index_url`. */
+interface IndexUrlValue {
+  readonly url: string
+  readonly source: string
+  readonly kind: string
+  readonly chunks: number
+  readonly requests: number
+  readonly truncated: boolean
+}
+
+/** `export_audit` no toma argumentos: exporta la sesion de la llamada. */
+type ExportAuditArgs = Record<string, never>
