@@ -12,7 +12,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { createMessage } from '@deepseek-ai/dsh-llm'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import type { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
+import type { ProjectionDefinition, SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import * as QuotaPlugin from '../src/index.ts'
 import {
   BUCKETS, QUOTA_PLAN, RPM_WINDOW_MS, foldQuotaEstimate, quotaEstimateProjectionDefinition, usageTokens,
@@ -20,9 +20,12 @@ import {
 } from '../src/projection.ts'
 import { KEY_LIMITS, PLANS, bucketOf } from '../src/limits.ts'
 
+/** La unidad tal y como el registro la consume: anota el `init` de dos argumentos. */
+const unit: ProjectionDefinition<'quotaEstimate', QuotaEstimateState> = quotaEstimateProjectionDefinition
+
 /** Una sesion vacia se pliega desde su estado inicial declarado. */
 function init(): QuotaEstimateState {
-  return quotaEstimateProjectionDefinition.init({} as never, 0 as never)
+  return unit.init({} as never, 0 as never)
 }
 
 /**
@@ -39,7 +42,20 @@ function assistantMessage(
   model: string,
   usage?: TokenUsage,
 ): SessionEvent {
-  return {
+  // El evento se compone a mano porque una sesion real necesitaria su log
+  // entero; el plegado solo lee el tiempo y `data`, y la comprobacion de forma
+  // la hace el registro, no esta prueba.
+  const event: {
+    time: number
+    type: 'assistant/message'
+    data: {
+      turn: number
+      step: number
+      stream: readonly never[]
+      message: ReturnType<typeof createMessage>
+      usage?: TokenUsage
+    }
+  } = {
     time,
     type: 'assistant/message',
     data: {
@@ -49,7 +65,8 @@ function assistantMessage(
       message: createMessage({ role: 'assistant', content: [], source: { kind: 'model', provider, model } }),
       ...usage === undefined ? {} : { usage },
     },
-  } as never as SessionEvent
+  }
+  return event as unknown as SessionEvent
 }
 
 /** Pliega una lista de eventos desde el estado inicial. */
@@ -73,9 +90,9 @@ describe('atribucion por ruta', () => {
 
   it('imputa cada modelo de Helmcode a su cubo', () => {
     const state = foldAll([
-      assistantMessage(1_000, 'helmcode', 'deepseek-v4-flash', { totalTokens: 1_000 }),
-      assistantMessage(2_000, 'helmcode', 'glm5.3', { totalTokens: 2_000 }),
-      assistantMessage(3_000, 'helmcode', 'qwen3.6', { totalTokens: 500 }),
+      assistantMessage(1_000, 'helmcode', 'deepseek-v4-flash', { inputTokens: 0, outputTokens: 0, totalTokens: 1_000 }),
+      assistantMessage(2_000, 'helmcode', 'glm5.3', { inputTokens: 0, outputTokens: 0, totalTokens: 2_000 }),
+      assistantMessage(3_000, 'helmcode', 'qwen3.6', { inputTokens: 0, outputTokens: 0, totalTokens: 500 }),
     ])
     expect(state.sota?.usedTokens).toBe(1_000)
     expect(state.addon?.usedTokens).toBe(2_000)
@@ -87,13 +104,24 @@ describe('atribucion por ruta', () => {
 
   it('ignora un mensaje cuya fuente no es un modelo', () => {
     const state = init()
-    const other = { time: 1, type: 'tool/result', data: { turn: 1, step: 1, message: { source: { kind: 'tool', callId: 'c' } } } } as never as SessionEvent
+    // La guarda mira la fuente: un mensaje de asistente que no venga de una
+    // ruta de modelo no tiene cubo al que imputarse.
+    const other = {
+      time: 1,
+      type: 'assistant/message',
+      data: {
+        turn: 1,
+        step: 1,
+        stream: [],
+        message: { source: { kind: 'tool', callId: 'c' } },
+      },
+    } as unknown as SessionEvent
     expect(foldQuotaEstimate(state, other)).toBe(state)
   })
 
   it('ignora cualquier evento que no sea un mensaje del asistente, sin cambiar la referencia', () => {
     const state = init()
-    const boundary = { time: 1, type: 'step/end', data: { turn: 1, step: 1 } } as never as SessionEvent
+    const boundary = { time: 1, type: 'step/end', data: { turn: 1, step: 1 } } as unknown as SessionEvent
     expect(foldQuotaEstimate(state, boundary)).toBe(state)
   })
 })
@@ -131,9 +159,9 @@ describe('tokens descontados', () => {
 describe('ventana deslizante de rpm', () => {
   it('cuenta las peticiones dentro de la ventana y descarta las que salen', () => {
     const state = foldAll([
-      assistantMessage(1_000_000, 'helmcode', 'deepseek-v4-flash', { totalTokens: 1 }),
-      assistantMessage(1_000_000 + RPM_WINDOW_MS, 'helmcode', 'qwen3.6', { totalTokens: 1 }),
-      assistantMessage(1_000_000 + RPM_WINDOW_MS + 1, 'helmcode', 'qwen3.6', { totalTokens: 1 }),
+      assistantMessage(1_000_000, 'helmcode', 'deepseek-v4-flash', { inputTokens: 0, outputTokens: 0, totalTokens: 1 }),
+      assistantMessage(1_000_000 + RPM_WINDOW_MS, 'helmcode', 'qwen3.6', { inputTokens: 0, outputTokens: 0, totalTokens: 1 }),
+      assistantMessage(1_000_000 + RPM_WINDOW_MS + 1, 'helmcode', 'qwen3.6', { inputTokens: 0, outputTokens: 0, totalTokens: 1 }),
     ])
     // La primera queda exactamente a 60s de la tercera: fuera, no dentro.
     expect(state.view.window.rpm).toBe(2)
@@ -148,9 +176,9 @@ describe('ventana deslizante de rpm', () => {
 
   it('una sola tasa por key: los tiempos de todos los cubos cuentan juntos', () => {
     const state = foldAll([
-      assistantMessage(1_000, 'helmcode', 'deepseek-v4-flash', { totalTokens: 1 }),
-      assistantMessage(1_100, 'helmcode', 'glm5.3', { totalTokens: 1 }),
-      assistantMessage(1_200, 'helmcode', 'gemma4', { totalTokens: 1 }),
+      assistantMessage(1_000, 'helmcode', 'deepseek-v4-flash', { inputTokens: 0, outputTokens: 0, totalTokens: 1 }),
+      assistantMessage(1_100, 'helmcode', 'glm5.3', { inputTokens: 0, outputTokens: 0, totalTokens: 1 }),
+      assistantMessage(1_200, 'helmcode', 'gemma4', { inputTokens: 0, outputTokens: 0, totalTokens: 1 }),
     ])
     expect(state.view.window.rpm).toBe(3)
     expect(state.view.buckets.map(entry => entry.bucket)).toEqual([...BUCKETS])
@@ -160,15 +188,21 @@ describe('ventana deslizante de rpm', () => {
 describe('estado del cubo senalado', () => {
   it('avisa al cruzar el umbral y marca agotado al llegar al tope', () => {
     const cap = PLANS[QUOTA_PLAN].sotaTokensPerMonth
-    const low = foldAll([assistantMessage(1, 'helmcode', 'deepseek-v4-flash', { totalTokens: cap * 0.85 })])
+    expect(cap).not.toBeNull()
+    const full = cap as number
+    const low = foldAll([
+      assistantMessage(1, 'helmcode', 'deepseek-v4-flash', { inputTokens: 0, outputTokens: 0, totalTokens: full * 0.85 }),
+    ])
     expect(low.view.status).toBe('low')
-    const exhausted = foldAll([assistantMessage(1, 'helmcode', 'deepseek-v4-flash', { totalTokens: cap })])
+    const exhausted = foldAll([
+      assistantMessage(1, 'helmcode', 'deepseek-v4-flash', { inputTokens: 0, outputTokens: 0, totalTokens: full }),
+    ])
     expect(exhausted.view.status).toBe('exhausted')
-    expect(exhausted.view.capTokens).toBe(cap)
+    expect(exhausted.view.capTokens).toBe(full)
   })
 
   it('un cubo sin tope se queda en orden y sin tope', () => {
-    const state = foldAll([assistantMessage(1, 'helmcode', 'gemma4', { totalTokens: 99_999_999_999 })])
+    const state = foldAll([assistantMessage(1, 'helmcode', 'gemma4', { inputTokens: 0, outputTokens: 0, totalTokens: 99_999_999_999 })])
     expect(state.view.bucket).toBe('unlimited')
     expect(state.view.capTokens).toBeNull()
     expect(state.view.status).toBe('ok')
@@ -186,7 +220,7 @@ describe('la unidad de proyeccion', () => {
   it('declara su clave, su version y publica la vista por el cable', () => {
     expect(quotaEstimateProjectionDefinition.key).toBe('quotaEstimate')
     expect(quotaEstimateProjectionDefinition.stateVersion).toBe(1)
-    const state = foldAll([assistantMessage(1, 'helmcode', 'deepseek-v4-flash', { totalTokens: 42 })])
+    const state = foldAll([assistantMessage(1, 'helmcode', 'deepseek-v4-flash', { inputTokens: 0, outputTokens: 0, totalTokens: 42 })])
     const view = quotaEstimateProjectionDefinition.wire.view(state)
     expect(view).toBe(state.view)
     expect(quotaEstimateProjectionDefinition.wire.viewSchema.safeParse(view).success).toBe(true)

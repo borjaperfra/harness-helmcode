@@ -8,6 +8,10 @@
  */
 
 import type { QuotaBucket, QuotaStatus } from './limits.ts'
+// Reexport de tipos, no `import type`: la augmentacion de `SessionProjectionMap`
+// tiene que sobrevivir a la emision de este `.d.ts`, y un import de tipos sin
+// bindings se elide entero.
+export type {} from '@deepseek-ai/dsh-session-projection/types'
 
 /** Tokens y peticiones medidos en un cubo. */
 export interface QuotaBucketUsage {
@@ -40,12 +44,21 @@ export interface QuotaEstimateView {
     readonly limit: number
   }
   /** Consumo por cubo, en el orden fijo de la tabla. */
-  readonly buckets: readonly QuotaBucketUsage[]
+  readonly buckets: QuotaBucketUsage[]
 }
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionMap {
     /** Estimacion local del consumo de cuota de Helmcode; la consola es la verdad. */
     quotaEstimate: QuotaEstimateView
+  }
+  /**
+   * El estado plegado de la unidad. Es la MISMA clave que la vista, y por eso
+   * las dos tablas se aumentan aqui juntas: el contrato de la unidad saca su
+   * `K` de `SessionProjectionStateMap`, y sin esta mitad la clave no existe
+   * para el registro.
+   */
+  interface SessionProjectionStateMap {
+    quotaEstimate: import('./projection.ts').QuotaEstimateState
   }
 }

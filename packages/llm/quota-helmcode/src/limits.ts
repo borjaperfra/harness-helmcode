@@ -249,7 +249,7 @@ export function quotaState(plan: PlanId, bucket: QuotaBucket, usedTokens: number
     }
   }
   const remaining = Math.max(0, cap - used)
-  const ratio = cap === 0 ? 1 : used / cap
+  const ratio = used / cap
   const status: QuotaStatus = remaining === 0 ? 'exhausted' : ratio >= LOW_WATERMARK ? 'low' : 'ok'
   return {
     bucket,
@@ -259,7 +259,7 @@ export function quotaState(plan: PlanId, bucket: QuotaBucket, usedTokens: number
     ratio,
     status,
     // Solo se degrada desde un cubo con tope: el ilimitado ya es el suelo.
-    degradationTarget: bucket === 'unlimited' ? undefined : DEFAULT_DEGRADATION_TARGET,
+    degradationTarget: DEFAULT_DEGRADATION_TARGET,
   }
 }
 
@@ -286,6 +286,7 @@ export function suggestDegradation(
   if (bucket === undefined || bucket === 'unlimited') return undefined
   const state = quotaState(plan, bucket, usedTokensInBucket)
   if (state.status !== 'exhausted') return undefined
-  // No se degrada al mismo modelo que ya se estaba pidiendo.
-  return state.degradationTarget === model ? undefined : state.degradationTarget
+  // La guarda del cubo ilimitado de arriba ya deja fuera el unico caso en que
+  // el suelo seria el mismo modelo que se pedia: aqui no hay bucle que temer.
+  return state.degradationTarget
 }

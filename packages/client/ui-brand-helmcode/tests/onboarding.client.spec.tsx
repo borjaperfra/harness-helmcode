@@ -14,7 +14,7 @@ import {
   type HelmcodeCredentialFace, type HelmcodeOnboardingProps,
 } from '../src/client/Onboarding.tsx'
 import { en, es } from '../src/client/locales.ts'
-import css from '../src/styles/Onboarding.module.css'
+import css from '../src/client/Onboarding.module.css'
 
 afterEach(cleanup)
 
@@ -63,16 +63,15 @@ async function panel(
   overrides: Partial<HelmcodeOnboardingProps> = {},
 ) {
   const complete = vi.fn()
-  const view = render(
-    <HelmcodeOnboarding
-      credentials={credentials}
-      t={t}
-      stepId="helmcode-api-key"
-      complete={complete}
-      openSection={vi.fn()}
-      {...overrides}
-    />,
-  )
+  const props = {
+    credentials,
+    t,
+    stepId: 'helmcode-api-key',
+    complete,
+    openSection: vi.fn(),
+    ...overrides,
+  } as unknown as HelmcodeOnboardingProps
+  const view = render(<HelmcodeOnboarding {...props} />)
   await waitFor(() => { expect(credentials.isConfigured).toHaveBeenCalled() })
   await waitFor(() => { expect(view.container.innerHTML).not.toBe('') }, { timeout: 2000, interval: 20 })
   return { ...view, complete }
@@ -81,21 +80,42 @@ async function panel(
 describe('HelmcodeOnboarding', () => {
   it('no pinta chrome mientras la credencial se esta comprobando', () => {
     const credentials: HelmcodeCredentialFace = { isConfigured: () => new Promise(() => {}), set: vi.fn() }
-    const { container } = render(
-      <HelmcodeOnboarding credentials={credentials} t={t} stepId="s" complete={vi.fn()} openSection={vi.fn()} />,
-    )
+    const props = {
+      credentials, t, stepId: 's', complete: vi.fn(), openSection: vi.fn(),
+    } as unknown as HelmcodeOnboardingProps
+    const { container } = render(<HelmcodeOnboarding {...props} />)
     expect(container.innerHTML).toBe('')
   })
 
   it('con la clave ya resuelta completa el paso sin estorbar', async () => {
     const { credentials, isConfigured } = face(true)
     const complete = vi.fn()
-    const { container } = render(
-      <HelmcodeOnboarding credentials={credentials} t={t} stepId="s" complete={complete} openSection={vi.fn()} />,
-    )
+    const props = {
+      credentials, t, stepId: 's', complete, openSection: vi.fn(),
+    } as unknown as HelmcodeOnboardingProps
+    const { container } = render(<HelmcodeOnboarding {...props} />)
     await waitFor(() => { expect(complete).toHaveBeenCalledTimes(1) })
     expect(isConfigured).toHaveBeenCalledTimes(1)
     expect(container.innerHTML).toBe('')
+  })
+
+  it('no publica la comprobacion de la credencial si el paso se desmonta antes', async () => {
+    let settle: ((has: boolean) => void) | undefined
+    const credentials: HelmcodeCredentialFace = {
+      isConfigured: () => new Promise<boolean>((resolve) => { settle = resolve }),
+      set: vi.fn(),
+    }
+    const props = {
+      credentials, t, stepId: 's', complete: vi.fn(), openSection: vi.fn(),
+    } as unknown as HelmcodeOnboardingProps
+    const view = render(<HelmcodeOnboarding {...props} />)
+    expect(view.container.innerHTML).toBe('')
+    view.unmount()
+    // La respuesta llega cuando el paso ya no esta: publicarla seria escribir
+    // estado en un componente desmontado.
+    settle?.(false)
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(view.container.innerHTML).toBe('')
   })
 
   it('un credential store que falla se lee como "sin clave", no como un panel colgado', async () => {
@@ -153,7 +173,13 @@ describe('HelmcodeOnboarding', () => {
       es['onboarding.stepLabel'].replace('{step}', String(step)).replace('{total}', '3')
     expect(container.textContent).toContain(reading(1))
     fireEvent.click(container.querySelector(ACTIONS) as Element)
-    await waitFor(() => { expect(container.textContent).toContain(reading(2)) })
+    await waitFor(() => { expect(container.querySelector('[data-step="two"]')).not.toBeNull() })
+    expect(container.textContent).toContain(reading(2))
+    // El boton de continuar pertenece al primer paso: una vez fuera de el, no
+    // queda nada que avanzar y el rotulo se queda donde esta.
+    fireEvent.click(container.querySelector(ACTIONS) as Element)
+    expect(container.textContent).toContain(reading(2))
+    expect(container.querySelector('[data-step="three"]')).toBeNull()
   })
 
   it('ensena el rechazo del host y no avanza: la clave no esta guardada', async () => {

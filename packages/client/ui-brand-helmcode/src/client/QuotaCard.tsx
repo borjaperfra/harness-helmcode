@@ -14,8 +14,8 @@ import type { ReactNode } from 'react'
 import type { QuotaEstimateView } from '@deepseek-ai/dsh-quota-helmcode/types'
 import type { UseProjection } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import type { HelmcodeKey } from '../locales.ts'
-import css from '../styles/QuotaCard.module.css'
+import type { HelmcodeKey } from './locales.ts'
+import css from './QuotaCard.module.css'
 
 /** Lo que la tarjeta puede consumir de la proyeccion. */
 export interface QuotaCardProps extends PropsLocale<'helmcode'> {
@@ -24,11 +24,14 @@ export interface QuotaCardProps extends PropsLocale<'helmcode'> {
 }
 
 /** Los tres estados del cubo, con su clase de color. */
-const STATUS_CLASS: Readonly<Record<QuotaEstimateView['status'], string>> = {
-  ok: css.stateOk,
-  low: css.stateLow,
-  exhausted: css.stateExhausted,
-}
+const STATUS_CLASS = {
+  // El modulo CSS virtual tipa sus clases como `string | undefined` bajo
+  // `noUncheckedIndexedAccess`; estas tres las declara QuotaCard.module.css, y
+  // el cierre de tipos que las une es este mismo mapa.
+  ok: css.stateOk as string,
+  low: css.stateLow as string,
+  exhausted: css.stateExhausted as string,
+} satisfies Record<QuotaEstimateView['status'], string>
 
 /** La clave de locale de cada cubo. */
 const BUCKET_KEY = {

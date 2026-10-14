@@ -5,14 +5,14 @@
  * es una estimacion local.
  */
 
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { en as commonEn, es as commonEs } from '@deepseek-ai/dsh-client-locale/src/locales/index.ts'
 import type { QuotaEstimateView } from '@deepseek-ai/dsh-quota-helmcode/types'
 import { QuotaCard, compactTokens, type QuotaCardProps } from '../src/client/QuotaCard.tsx'
 import { en, es } from '../src/client/locales.ts'
-import css from '../src/styles/QuotaCard.module.css'
+import css from '../src/client/QuotaCard.module.css'
 
 afterEach(cleanup)
 
@@ -38,7 +38,7 @@ function estimate(overrides: Partial<QuotaEstimateView> = {}): QuotaEstimateView
 
 /** Un lector de proyeccion que solo conoce `quotaEstimate`. */
 function projections(value: QuotaEstimateView | undefined): QuotaCardProps['useProjection'] {
-  return ((key: string) => key === 'quotaEstimate' ? value : undefined) as QuotaCardProps['useProjection']
+  return (key: string) => key === 'quotaEstimate' ? value : undefined
 }
 
 function card(value: QuotaEstimateView | undefined, translate = t) {
@@ -119,10 +119,20 @@ describe('QuotaCard', () => {
   })
 
   it('no pinta nada sin proyeccion: una sesion sin medidor no tiene tarjeta', () => {
-    const useProjection = vi.fn(projections(undefined))
-    const { container } = render(<QuotaCard useProjection={useProjection} t={t} />)
+    const props = { useProjection: projections(undefined), t }
+    const { container } = render(<QuotaCard {...props} />)
     expect(container.innerHTML).toBe('')
-    expect(useProjection).toHaveBeenCalledWith('quotaEstimate')
+  })
+
+  it('se suscribe a la unica clave que sabe leer', () => {
+    const keys: string[] = []
+    const useProjection = ((key: string) => {
+      keys.push(key)
+      return estimate()
+    }) as unknown as QuotaCardProps['useProjection']
+    const props = { useProjection, t }
+    render(<QuotaCard {...props} />)
+    expect([...new Set(keys)]).toEqual(['quotaEstimate'])
   })
 
   it('formatea las cifras en miles de millones, con decimal solo cuando aporta', () => {

@@ -20,7 +20,11 @@
  */
 
 import { z } from 'zod'
-import type { SessionEvent } from '@deepseek-ai/dsh-session-projection'
+import type { SessionEvent } from '@deepseek-ai/dsh-session'
+// Reexport de tipos: mantiene la tabla de proyecciones (y su augmentacion) en
+// el programa que compila este modulo.
+export type {} from '@deepseek-ai/dsh-session-projection/types'
+import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm'
 import {
   DEFAULT_PLAN, KEY_LIMITS, bucketOf, largestBucket, quotaState,
@@ -167,6 +171,11 @@ function emptyView(): QuotaEstimateView {
 export function foldQuotaEstimate(state: QuotaEstimateState, event: SessionEvent): QuotaEstimateState {
   if (event.type !== 'assistant/message') return state
   const source = event.data.message.source
+  // La guarda es defensiva, no decorativa: el contrato tipa la fuente de un
+  // mensaje de asistente como ruta de modelo, pero el log es duradero y una
+  // entrada reparada o migrada puede traer otra cosa. Sin ella, `bucketOf`
+  // recibiria `undefined` en lugar de un cubo.
+  // oxlint-disable-next-line typescript/no-unnecessary-condition -- log duradero, no solo el tipo en memoria
   if (source.kind !== 'model') return state
   const bucket = bucketOf(source.provider, source.model)
   if (bucket === undefined) return state
@@ -199,7 +208,7 @@ export const quotaEstimateProjectionDefinition = {
     viewSchema: quotaEstimateSchema,
     view: (state: QuotaEstimateState) => state.view,
   },
-}
+} satisfies ProjectionDefinition<'quotaEstimate', QuotaEstimateState>
 
 /** Los cubos publicados por la vista, en su orden fijo. */
 export { BUCKETS }

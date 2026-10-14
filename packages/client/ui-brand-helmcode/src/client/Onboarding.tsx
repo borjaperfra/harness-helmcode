@@ -14,7 +14,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import css from '../styles/Onboarding.module.css'
+import css from './Onboarding.module.css'
 
 /** El asiento de locale del paquete. */
 type OnboardingLocale = PropsLocale<'helmcode'>
@@ -35,7 +35,10 @@ export interface HelmcodeCredentialFace {
 }
 
 /** Los tres pasos del panel, en orden. */
-const STEPS = ['one', 'two', 'three'] as const
+export const STEPS = ['one', 'two', 'three'] as const
+
+/** El nombre del paso activo. */
+type StepId = typeof STEPS[number]
 
 /**
  * Los cuatro modelos que la ruta europea sirve, con la clave de locale de cada
@@ -96,7 +99,7 @@ export type HelmcodeOnboardingProps =
  */
 export function HelmcodeOnboarding({ credentials, t, complete }: HelmcodeOnboardingProps): ReactNode {
   const [configured, setConfigured] = useState<Configured>('unknown')
-  const [step, setStep] = useState(0)
+  const [step, setStep] = useState<StepId>('one')
   const [key, setKey] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -116,7 +119,12 @@ export function HelmcodeOnboarding({ credentials, t, complete }: HelmcodeOnboard
       } catch {
         has = false
       }
-      if (live) setConfigured(has ? 'yes' : 'no')
+      // La bandera se lee despues del `await`, que es justo el punto en que el
+      // paso puede haberse desmontado: el analizador la ve siempre cierta
+      // porque solo mira el camino sincrono.
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- la cancelacion solo es observable tras el await
+      if (!live) return
+      setConfigured(has ? 'yes' : 'no')
     })()
     return () => { live = false }
   }, [credentials])
@@ -130,14 +138,12 @@ export function HelmcodeOnboarding({ credentials, t, complete }: HelmcodeOnboard
     return null
   }
 
-  const stepId = STEPS[step] ?? 'one'
-
   const next = (): void => {
-    if (step < STEPS.length - 1) setStep(step + 1)
+    if (step === 'one') setStep('two')
   }
 
-  /** El paso 2: el del modelo, al que se llega guardando la clave. */
-  const MODEL_STEP = 1
+  /** El paso del modelo, al que se llega guardando la clave. */
+  const MODEL_STEP: StepId = 'two'
 
   const save = async (): Promise<void> => {
     setSaving(true)
@@ -161,9 +167,9 @@ export function HelmcodeOnboarding({ credentials, t, complete }: HelmcodeOnboard
       <section className={css.panel} role="dialog" aria-modal="true" aria-label={t('onboarding.title')}>
         <span className={css.eyebrow}>{t('eyebrow.plan')}</span>
         <h2 className={css.title}>{t('onboarding.title')}</h2>
-        <p className={css.stepLabel}>{t('onboarding.stepLabel', { step: step + 1, total: STEPS.length })}</p>
+        <p className={css.stepLabel}>{t('onboarding.stepLabel', { step: STEPS.indexOf(step) + 1, total: STEPS.length })}</p>
 
-        <section className={css.step} data-step={stepId}>
+        <section className={css.step} data-step={step}>
           <h3 className={css.stepTitle}>{t('onboarding.createKey')}</h3>
           <p className={css.body}>{t('onboarding.consoleHint')}</p>
           <a className={css.link} href={consoleHref()} target="_blank" rel="noreferrer">
@@ -172,7 +178,7 @@ export function HelmcodeOnboarding({ credentials, t, complete }: HelmcodeOnboard
           <button type="button" className={css.action} onClick={next}>{t('onboarding.next')}</button>
         </section>
 
-        <section className={css.step} data-step={stepId}>
+        <section className={css.step} data-step={step}>
           <h3 className={css.stepTitle}>{t('onboarding.pasteKey')}</h3>
           <p className={css.body}>{t('onboarding.pasteHint')}</p>
           <input
@@ -192,7 +198,7 @@ export function HelmcodeOnboarding({ credentials, t, complete }: HelmcodeOnboard
           </button>
         </section>
 
-        <section className={css.step} data-step={stepId}>
+        <section className={css.step} data-step={step}>
           <h3 className={css.stepTitle}>{t('onboarding.chooseModel')}</h3>
           <p className={css.body}>{t('onboarding.modelsHint')}</p>
           <div className={css.models}>

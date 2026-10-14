@@ -61,10 +61,6 @@ export const es = {
   'index.recovery': 'Índice de recuperación',
   'index.workspace': 'Indexar workspace',
   'index.search': 'Buscar en el conocimiento',
-  // Onboarding de la clave.
-  'onboarding.createKey': 'Crea tu API key',
-  'onboarding.pasteKey': 'Pégala aquí',
-  'onboarding.chooseModel': 'Elige el modelo',
   // Eyebrows: el titulo en `//` de las secciones propias de Helmcode.
   'eyebrow.plan': '// plan',
   'eyebrow.residency': '// residencia',

@@ -2,11 +2,20 @@
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "lib/types",
-    "paths": {}
+    "outDir": "lib/types"
   },
   "include": [
     "src"
   ],
-  "references": []
+  "references": [
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../session/session-projection"
+    }
+  ]
 }
