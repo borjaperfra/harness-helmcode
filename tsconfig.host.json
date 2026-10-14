@@ -400,6 +400,7 @@
     { "path": "./packages/guard/eu-routing" },
     { "path": "./packages/guard/privacy-helmcode" },
     { "path": "./packages/retrieval/helmcode" },
+    { "path": "./packages/speech/speech-to-text-helmcode" },
     { "path": "./packages/runtime-diagnostics/invariants" },
     { "path": "./packages/test-support/agent-loop-testkit" },
     { "path": "./packages/acp/acp" },

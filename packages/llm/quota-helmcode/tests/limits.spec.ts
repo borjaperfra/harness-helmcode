@@ -12,6 +12,7 @@ import {
   UNLIMITED_MODELS,
   bucketOf,
   concurrencyLimitFor,
+  largestBucket,
   monthlyCapTokens,
   quotaState,
   suggestDegradation,
@@ -82,6 +83,27 @@ describe('cuotas por plan', () => {
 
   it('asume growth cuando el perfil no dice plan', () => {
     expect(DEFAULT_PLAN).toBe('growth')
+  })
+})
+
+describe('el cubo que la tarjeta senala', () => {
+  it('elige el de mayor consumo', () => {
+    expect(largestBucket({ sota: 10, addon: 50, unlimited: 1 })).toEqual({ bucket: 'addon', usedTokens: 50 })
+    expect(largestBucket({ sota: 10, addon: 0, unlimited: 0 })).toEqual({ bucket: 'sota', usedTokens: 10 })
+  })
+
+  it('resuelve los empates por el orden fijo de los cubos, no por el del objeto', () => {
+    // Dos rutas con las mismas cifras deben pintar la misma tarjeta en
+    // cualquier motor, y el orden de las claves de un objeto no es contrato.
+    const expected = { bucket: 'sota', usedTokens: 7 }
+    expect(largestBucket({ unlimited: 7, addon: 7, sota: 7 })).toEqual(expected)
+    expect(largestBucket({ sota: 7, unlimited: 7, addon: 7 })).toEqual(expected)
+  })
+
+  it('no senala nada sin consumo, y no deja pasar cifras imposibles', () => {
+    expect(largestBucket({ sota: 0, addon: 0, unlimited: 0 })).toBeUndefined()
+    expect(largestBucket({ sota: Number.NaN, addon: -5, unlimited: 0 })).toBeUndefined()
+    expect(largestBucket({ sota: Number.NaN, addon: 3, unlimited: 0 })).toEqual({ bucket: 'addon', usedTokens: 3 })
   })
 })
 

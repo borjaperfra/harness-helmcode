@@ -167,6 +167,38 @@ export function monthlyCapTokens(plan: PlanId, bucket: QuotaBucket): number | nu
 /** Como de cerca esta el consumo del tope. */
 export type QuotaStatus = 'ok' | 'low' | 'exhausted'
 
+/** El cubo de mayor consumo, o `undefined` sin ningun cubo con consumo. */
+export interface LargestBucket {
+  /** El cubo senalado. */
+  readonly bucket: QuotaBucket
+  /** Tokens consumidos en ese cubo. */
+  readonly usedTokens: number
+}
+
+/**
+ * Elige el cubo que la tarjeta senala: el de mayor consumo.
+ *
+ * Los empates se resuelven por el orden fijo de los cubos (`sota`, `addon`,
+ * `unlimited`), no por el orden de las claves del objeto: dos rutas con las
+ * mismas cifras deben pintar la misma tarjeta en cualquier motor.
+ *
+ * @param used - tokens consumidos por cubo; un valor ausente es cero.
+ * @returns el cubo de mayor consumo, o `undefined` cuando no hay ninguno.
+ */
+export function largestBucket(
+  used: Readonly<Record<QuotaBucket, number>>,
+): LargestBucket | undefined {
+  const order: readonly QuotaBucket[] = ['sota', 'addon', 'unlimited']
+  let largest: LargestBucket | undefined
+  for (const bucket of order) {
+    const value = used[bucket]
+    const tokens = Number.isFinite(value) && value > 0 ? value : 0
+    if (tokens === 0 || (largest !== undefined && tokens <= largest.usedTokens)) continue
+    largest = { bucket, usedTokens: tokens }
+  }
+  return largest
+}
+
 /** Estado de un cubo medido contra su tope. */
 export interface QuotaState {
   /** El cubo medido. */

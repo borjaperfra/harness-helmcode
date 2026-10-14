@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { Context } from '@deepseek-ai/cordis'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
@@ -21,7 +21,17 @@ afterEach(() => {
 /** Rank this skin registers at; below a shipped occupant so the cell is taken. */
 const BRAND_PRIORITY = -10
 
-const HOLES = ['sidebar.brand.mark', 'sidebar.brand.name'] as const
+/**
+ * The holes this skin fills. `settings.onboarding` is the root step the panel
+ * takes; `conversation.session.header.utilities` is the session-scoped list the
+ * quota card joins.
+ */
+const HOLES = [
+  { name: 'sidebar.brand.mark', kind: 'single', scope: 'root' },
+  { name: 'sidebar.brand.name', kind: 'single', scope: 'root' },
+  { name: 'conversation.session.header.utilities', kind: 'list', scope: 'session' },
+  { name: 'settings.onboarding', kind: 'list', scope: 'root' },
+] as const
 
 interface CapturedOverride {
   source: string
@@ -30,9 +40,9 @@ interface CapturedOverride {
 
 /**
  * Build a client context carrying a recording theme stub, the real slot
- * registry, and a real locale runtime, with the sidebar holes optionally
- * declared first.
- * @param declare - Whether to declare the brand holes before applying.
+ * registry, a real locale runtime, and a credentials remote, with the holes
+ * optionally declared first.
+ * @param declare - Whether to declare the slots before applying.
  * @returns The context, registry, recorder, locale, and hole controls.
  */
 async function bench(declare = true) {
@@ -51,9 +61,20 @@ async function bench(declare = true) {
   const locale = new LocaleRuntime(ctx)
   locale.setLocale('es')
   ctx.provide('locale', locale)
+  const credentials = {
+    describe: async (refs: string[]) => ({
+      ok: true,
+      value: Object.fromEntries(refs.map(ref => [ref, { configured: false, writable: true }])),
+    }),
+    set: async () => ({ ok: true, value: undefined }),
+  }
+  ctx.provide('remote', { credentials } as never)
+  // The credentials Remote namespace is its own service key, exactly as the
+  // generated contribution registers it on the browser side.
+  ctx.provide('remote.credentials', credentials as never)
   const declareHoles = (): (() => void) => slots.register({
     name: 'root',
-    children: Object.fromEntries(HOLES.map(name => [name, { kind: 'single', scope: 'root' }])),
+    children: Object.fromEntries(HOLES.map(hole => [hole.name, { kind: hole.kind, scope: hole.scope }])),
   } as never, () => null)
   const disposeHoles = declare ? declareHoles() : undefined
   return { ctx, slots, overrides, locale, declareHoles, disposeHoles }
@@ -64,8 +85,8 @@ describe('helmcode brand skin plugin', () => {
     expect(hostApply).not.toThrow()
   })
 
-  it('declares the theme, slot, and locale services it uses', () => {
-    expect(inject).toEqual(['theme', 'slots', 'locale'])
+  it('declares the theme, slot, locale, and credentials services it uses', () => {
+    expect(inject).toEqual(['theme', 'slots', 'locale', 'remote', 'remote.credentials'])
   })
 
   it('registers its own namespace under both languages and releases it with the fiber', async () => {
@@ -110,29 +131,29 @@ describe('helmcode brand skin plugin', () => {
     const subject = await bench()
     const fiber = subject.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    for (const hole of HOLES) {
-      const entries = subject.slots.entries(hole)
-      expect(entries, hole).toHaveLength(1)
+    for (const hole of HOLES.filter(entry => entry.name.startsWith('sidebar.brand'))) {
+      const entries = subject.slots.entries(hole.name)
+      expect(entries, hole.name).toHaveLength(1)
       expect(entries[0]?.options.priority).toBe(BRAND_PRIORITY)
     }
 
     subject.disposeHoles?.()
-    for (const hole of HOLES) expect(subject.slots.entries(hole), hole).toHaveLength(0)
+    for (const hole of HOLES) expect(subject.slots.entries(hole.name), hole.name).toHaveLength(0)
     subject.declareHoles()
     await Promise.resolve()
-    for (const hole of HOLES) expect(subject.slots.entries(hole), hole).toHaveLength(1)
+    for (const hole of HOLES) expect(subject.slots.entries(hole.name), hole.name).toHaveLength(1)
 
     await fiber.dispose()
-    for (const hole of HOLES) expect(subject.slots.entries(hole), hole).toHaveLength(0)
+    for (const hole of HOLES) expect(subject.slots.entries(hole.name), hole.name).toHaveLength(0)
   })
 
   it('fills a declaration that arrives after apply', async () => {
     const subject = await bench(false)
     await subject.ctx.plugin({ inject: [...inject], apply }).await()
-    for (const hole of HOLES) expect(subject.slots.entries(hole), hole).toHaveLength(0)
+    for (const hole of HOLES) expect(subject.slots.entries(hole.name), hole.name).toHaveLength(0)
     subject.declareHoles()
     await Promise.resolve()
-    for (const hole of HOLES) expect(subject.slots.entries(hole), hole).toHaveLength(1)
+    for (const hole of HOLES) expect(subject.slots.entries(hole.name), hole.name).toHaveLength(1)
   })
 
   it('mounts its own sheet and retracts it with the plugin', async () => {
@@ -148,6 +169,29 @@ describe('helmcode brand skin plugin', () => {
     expect(tag?.getAttribute('data-plugin-css')).toBe('@deepseek-ai/dsh-client-ui-brand-helmcode/helmcode.css')
     await fiber.dispose()
     expect(document.head.querySelector(selector)).toBeNull()
+  })
+
+  it('takes the quota card seat in the session header and the onboarding step in settings', async () => {
+    const subject = await bench()
+    const fiber = subject.ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    // La tarjeta va DESPUES de las utilidades que ya ocupaban el asiento: es un
+    // indicador, no una accion.
+    const quota = subject.slots.entries('conversation.session.header.utilities')[0]
+    expect(quota?.options.id).toBe('helmcode-quota')
+    expect(quota?.options.order).toBe(50)
+    expect(quota?.locale).toBe(NS)
+    // El paso se sirve desactivado por defecto y comprueba la credencial el
+    // mismo; el coordinador lo completa solo cuando la clave ya esta.
+    const onboarding = subject.slots.entries('settings.onboarding')[0]
+    expect(onboarding?.options.id).toBe('helmcode-api-key')
+    expect(onboarding?.options.order).toBe(-10)
+    // Y su cara inyectada lee el credential store con la referencia del bundle.
+    const face = (onboarding?.inject as (() => { credentials: { isConfigured: () => Promise<boolean> } }) | undefined)?.()
+    expect(await face?.credentials.isConfigured()).toBe(false)
+    await fiber.dispose()
+    expect(subject.slots.entries('settings.onboarding')).toHaveLength(0)
+    expect(subject.slots.entries('conversation.session.header.utilities')).toHaveLength(0)
   })
 
   it('renders the bare symbol in the collapsed rail and the lockup in the expanded row', () => {
@@ -168,5 +212,36 @@ describe('helmcode brand skin plugin', () => {
   it('renders the wordmark alone for the name seat', () => {
     const name = render(<HelmcodeBrandName />)
     expect(name.container.querySelector('svg')?.getAttribute('viewBox')).toBe('104 0 442 103')
+  })
+
+  it('builds the credential face over the credentials remote namespace', async () => {
+    const describe = vi.fn(async (refs: string[]) => ({
+      ok: true as const,
+      value: Object.fromEntries(refs.map(ref => [ref, { configured: ref === 'HELMCODE_API_KEY', writable: true }])),
+    }))
+    const set = vi.fn(async () => ({ ok: true as const, value: undefined }))
+    const ctx = new Context()
+    ctx.provide('remote', { credentials: { describe, set } } as never)
+    const { credentialFace, API_KEY_REF } = await import('../src/client/index.ts')
+    expect(API_KEY_REF).toBe('HELMCODE_API_KEY')
+    const face = credentialFace(ctx)
+    expect(await face.isConfigured()).toBe(true)
+    expect(describe).toHaveBeenCalledWith(['HELMCODE_API_KEY'])
+    expect(await face.set('hc-live')).toBeUndefined()
+    expect(set).toHaveBeenCalledWith('HELMCODE_API_KEY', 'hc-live')
+  })
+
+  it('reports a refused credential read as not configured, and a refusal message on write', async () => {
+    const ctx = new Context()
+    ctx.provide('remote', {
+      credentials: {
+        describe: async () => ({ ok: false, error: { code: 'gateway/internal', message: 'no provider' } }),
+        set: async () => ({ ok: false, error: { code: 'credential/rejected', message: 'read-only source' } }),
+      },
+    } as never)
+    const { credentialFace } = await import('../src/client/index.ts')
+    const face = credentialFace(ctx)
+    expect(await face.isConfigured()).toBe(false)
+    expect(await face.set('x')).toBe('read-only source')
   })
 })
