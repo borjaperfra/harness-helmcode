@@ -1,0 +1,92 @@
+{
+  "formatVersion": 2,
+  "roots": [
+    {
+      "key": "event:identity/operator",
+      "kind": "event",
+      "event": "identity/operator",
+      "surface": false,
+      "digest": "9eb055ec1c85a7b11eb6268dc688d8fddd7a94a4bc61d8a3f697e758aef54867",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 5,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 7,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "at",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "operator",
+                "type": 3,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              2,
+              4
+            ]
+          },
+          {
+            "kind": "primitive",
+            "type": "null"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "identity/operator"
+          }
+        ]
+      }
+    }
+  ],
+  "types": []
+}

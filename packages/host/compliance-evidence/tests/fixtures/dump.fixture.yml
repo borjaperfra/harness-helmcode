@@ -85,6 +85,13 @@
   name: '@deepseek-ai/dsh-privacy-helmcode'
   config:
     ttlDays: 30
+# La fila de identidad local, con la forma que declara el bundle
+# (`packages/bundle/helmcode/cordis.patch.yml`: la fila va SIN `config` y las dos
+# claves quedan comentadas, porque el operador por defecto es un dato del perfil
+# del cliente). `defaultOperator` NO se declara a proposito: asi el fixture
+# ejercita la ausencia declarada, que es el estado real de este bundle.
+- id: identity-local
+  name: '@deepseek-ai/dsh-identity-local'
 # == @deepseek-ai/dsh-base
 - id: session-persistence-jsonl
   name: '@deepseek-ai/dsh-session-persistence-jsonl'

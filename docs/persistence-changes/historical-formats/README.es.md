@@ -33,7 +33,7 @@ El índice se genera a partir de snapshots validados y de la constante del escri
 | 2 | `dsh-v0.1.3-alpha.2` | [V2](v2.es.md) | [JSON](v2.schema.json) | 56 / 435 |
 | 3 | PR #4320 | [V3](v3.es.md) | [JSON](v3.schema.json) | 60 / 467 |
 | 4 | `dsh-v4-final-baseline` | [V4](v4.es.md) | [JSON](v4.schema.json) | 60 / 575 |
-| 5 | Árbol de trabajo actual | [Catálogo actual](../../persistence-catalog.es.md) | [JSON](../../persistence-schema.json) | 60 / 576 |
+| 5 | Árbol de trabajo actual | [Catálogo actual](../../persistence-catalog.es.md) | [JSON](../../persistence-schema.json) | 61 / 580 |
 
 <!-- persistence-format-index:end -->
 

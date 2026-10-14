@@ -20,6 +20,7 @@ import {
   dumpRows,
   renderValue,
   rowLabel,
+  sectionAttribution,
   sectionDeploymentRequirement,
   sectionEgressChannels,
   sectionInferenceRoutes,
@@ -237,6 +238,26 @@ describe('secciones: filas presentes con campos ausentes', () => {
     ]))
     expect(report).toContain('Raíz: (sin declarar)')
     expect(report).toContain('Ruta: /srv/credenciales.yaml')
+  })
+
+  it('declara la atribución cuando la fila no trae configuración legible o no es una cadena', () => {
+    // Una fila sin `config` legible no declara nada: se imprime la ausencia.
+    const sinConfig = sectionAttribution(evidenceInput([
+      { id: 'identity-local', name: '@deepseek-ai/dsh-identity-local', config: 'no-es-objeto' },
+    ]))
+    expect(sinConfig).toContain('**no declara `defaultOperator`**')
+    expect(sinConfig).toContain('estado: activa (sin `disabled`)')
+
+    // Un `!!js` es una declaración que el informe no evalúa: se imprime tal cual.
+    const expresion = sectionAttribution(evidenceInput([
+      {
+        id: 'identity-local',
+        name: '@deepseek-ai/dsh-identity-local',
+        config: { defaultOperator: { $js: 'operatorName()' } },
+      },
+    ]))
+    expect(expresion).toContain('no evalúa ni interpreta: `!!js operatorName()`')
+    expect(expresion).not.toContain('**no declara `defaultOperator`**')
   })
 
   it('reconoce la fila del proxy cuando el volcado la declara', () => {

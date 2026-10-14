@@ -35,7 +35,7 @@ export const GENERATOR_NAME = '@deepseek-ai/dsh-compliance-evidence'
 export const REPORT_TITLE = 'Informe de evidencia: residencia de inferencia y canales de salida'
 
 /**
- * Construye el informe completo en Markdown: encabezado más las nueve secciones
+ * Construye el informe completo en Markdown: encabezado más las diez secciones
  * obligatorias, en orden.
  * @param input - el volcado ya parseado, la tabla de residencia y los metadatos.
  * @returns el Markdown del informe, terminado en salto de línea.

@@ -10216,6 +10216,92 @@
       }
     },
     {
+      "key": "event:identity/operator",
+      "kind": "event",
+      "event": "identity/operator",
+      "surface": false,
+      "digest": "9eb055ec1c85a7b11eb6268dc688d8fddd7a94a4bc61d8a3f697e758aef54867",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 5,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 7,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "at",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "operator",
+                "type": 3,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              2,
+              4
+            ]
+          },
+          {
+            "kind": "primitive",
+            "type": "null"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "identity/operator"
+          }
+        ]
+      }
+    },
+    {
       "key": "event:image/offload",
       "kind": "event",
       "event": "image/offload",
@@ -22019,6 +22105,13 @@
       "sources": []
     },
     {
+      "digest": "1ff36ac46a3c33f100ba41c158902732f91bf2749db5cea38a5fcb73c97692c4",
+      "names": [],
+      "sources": [
+        "packages/identity/identity-local/src/index.ts:46"
+      ]
+    },
+    {
       "digest": "20a57544bbf204dacd1ae6beb2ab29444365c3c869f2afdf489dcdcbc3d9c8c5",
       "names": [],
       "sources": [
@@ -22983,6 +23076,11 @@
       ]
     },
     {
+      "digest": "64d6f42388779c6acfac2cf7948972cb880180e8041c501ebf0fb78cb2e05bb8",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "6598cd6da253948d6b207c6374a45335804c79b576866d6215649c2d1bc85e25",
       "names": [
         "packages/experimental/agent-team/src/types.ts#TeamMemberSnapshot"
@@ -23248,6 +23346,11 @@
       "sources": [
         "packages/core/session/src/types.ts:212"
       ]
+    },
+    {
+      "digest": "799231ac91869a6695666505343003905638e1b4d11349bff953d4dbfe3191ba",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "79ddc907312f97cf9553d4841e8b3fc937097bd8d97900a790efad3c05255e99",
@@ -23752,6 +23855,11 @@
         "packages/compaction/compaction/src/types.ts:38",
         "packages/compaction/compaction/src/types.ts:84"
       ]
+    },
+    {
+      "digest": "9eb055ec1c85a7b11eb6268dc688d8fddd7a94a4bc61d8a3f697e758aef54867",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "9edc162949abf93bd5ff049191b345454ba104f583937ce5580fb50f067d2b94",

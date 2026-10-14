@@ -1494,6 +1494,34 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-host-webserver -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-identity-local -->
+<a id="deepseek-aidsh-identity-local"></a>
+
+## `@deepseek-ai/dsh-identity-local`
+
+- `inject`: `sessionProjections`
+- `source`: [`packages/identity/identity-local/src/index.ts:93`](../packages/identity/identity-local/src/index.ts)
+
+```ts config-catalog
+/** The {@link IdentityLocalService} config: the profile default and the deployment's requirement. */
+export interface Config {
+  /**
+   * Operator the profile attributes by default: the seed of every session whose
+   * log records no `identity/operator` event of its own. Omitted: sessions start
+   * unattributed, and only the `/operator` command attributes them.
+   */
+  defaultOperator?: string
+  /**
+   * Whether this deployment demands an operator. `true` writes a system notice
+   * to the process log when a session starts with no operator; it never blocks
+   * the turn, and no session message is appended (the log-only attribution
+   * event is the only durable thing this plugin writes).
+   */
+  requireOperator: boolean
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-identity-local -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-invariants -->
 <a id="deepseek-aidsh-invariants"></a>
 

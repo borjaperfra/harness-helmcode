@@ -21,6 +21,7 @@ export {
   renderValue,
   residencyOf,
   rowLabel,
+  sectionAttribution,
   sectionDeploymentRequirement,
   sectionEgressChannels,
   sectionFingerprint,

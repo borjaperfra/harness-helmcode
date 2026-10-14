@@ -261,6 +261,12 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-host-plugin-inventory` | no | Read-only Remote projection of current Cordis Loader plugin state |
 | `@deepseek-ai/dsh-host-webserver` | yes | Web route-registration plugin: HTTP and upgrade routes, index transform taps, and static dist fallback; knows no harness concepts |
 
+## identity
+
+| Package | Config | Description |
+|---|---|---|
+| `@deepseek-ai/dsh-identity-local` | yes | Atribucion durable de sesiones a un operador local (ctx.identityLocal) para el DeepSeek Harness: comando /operator, evento solo-log identity/operator y proyeccion operator, sin capa de autenticacion |
+
 ## interaction
 
 | Package | Config | Description |

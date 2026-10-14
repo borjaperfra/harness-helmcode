@@ -36,6 +36,7 @@
   "dependencies": {
     "@deepseek-ai/dsh-client-ui-brand-helmcode": "workspace:*",
     "@deepseek-ai/dsh-guard-eu-routing": "workspace:*",
+    "@deepseek-ai/dsh-identity-local": "workspace:*",
     "@deepseek-ai/dsh-llm-pi-ai": "workspace:*",
     "@deepseek-ai/dsh-privacy-helmcode": "workspace:*",
     "@deepseek-ai/dsh-retrieval-helmcode": "workspace:*"

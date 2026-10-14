@@ -94,7 +94,7 @@ function dumpWithoutRedaction(): unknown {
 }
 
 describe('buildEvidenceReport', () => {
-  it('incluye las nueve secciones obligatorias, en orden', () => {
+  it('incluye las diez secciones obligatorias, en orden', () => {
     const report = buildEvidenceReport(baseInput())
     let previous = -1
     SECTION_TITLES.forEach((title, index) => {
@@ -102,9 +102,11 @@ describe('buildEvidenceReport', () => {
       expect(position).toBeGreaterThan(previous)
       previous = position
     })
-    expect(SECTION_TITLES.length).toBe(9)
+    expect(SECTION_TITLES.length).toBe(10)
     // La sección del canal de redacción va justo detrás de la superficie local.
     expect(SECTION_TITLES[5]).toBe('Canal de redacción')
+    // La atribución va justo detrás, y delante del requisito de despliegue.
+    expect(SECTION_TITLES[6]).toBe('Atribución')
   })
 
   it('lleva las dos frases literales, tal cual', () => {
@@ -259,6 +261,44 @@ describe('buildEvidenceReport', () => {
     expect(report).not.toContain('**no declara `mapPath`**')
   })
 
+  it('declara la atribución: dónde vive, qué operador por defecto declara y qué no es', () => {
+    const report = buildEvidenceReport(baseInput())
+    expect(report).toContain('## 7. Atribución')
+    expect(report).toContain('Fila `identity-local` (plugin `@deepseek-ai/dsh-identity-local`)')
+    // El fixture no declara `defaultOperator`, como el bundle: la ausencia se
+    // declara en vez de rellenarse con un operador supuesto.
+    expect(report).toContain('**no declara `defaultOperator`**')
+    expect(report).toContain('Atribución por sesión: vive en el **log de la sesión**')
+    expect(report).toContain('`identity/operator`')
+    expect(report).toContain('fuera del transcript del modelo')
+    expect(report).toContain('Esto es atribución, no autenticación')
+    expect(report).toContain('quien tiene la URL de arranque sigue siendo el dueño del harness')
+    expect(report).toContain('no separa usuarios en un mismo nodo')
+    // El informe no lee logs de sesión: no puede atribuir ninguna sesión concreta.
+    expect(report).toContain('no puede decir a qué operador quedó atribuida ninguna sesión')
+  })
+
+  it('imprime el `defaultOperator` declarado en la fila', () => {
+    const dump = cloneDump()
+    const row = dumpRows(dump).find(candidate => candidate.id === 'identity-local')
+    if (row === undefined) throw new Error('el fixture debería traer la fila identity-local')
+    // La fila del fixture va sin `config` (como la del bundle): aquí se declara
+    // el operador por defecto que un perfil de cliente sí pone.
+    row.value['config'] = { defaultOperator: 'operador-del-cliente' }
+    const report = buildEvidenceReport(baseInput(dump))
+
+    expect(report).toContain('Operador por defecto: `operador-del-cliente` (declarado en la fila)')
+    expect(report).not.toContain('**no declara `defaultOperator`**')
+  })
+
+  it('dice que falta la fila de identidad en vez de callarse', () => {
+    const dump = (cloneDump() as readonly unknown[])
+      .filter(entry => (entry as DumpRecord)['id'] !== 'identity-local')
+    const report = buildEvidenceReport(baseInput(dump))
+    expect(report).toContain('**La fila `identity-local` NO aparece en el volcado compuesto.**')
+    expect(report).toContain('no permite responder «¿quién hizo esto?»')
+  })
+
   it('declara los valores por defecto cuando la fila no trae configuración legible', () => {
     const dump = cloneDump()
     // Una fila sin `config` es una fila que no declara nada: el informe imprime
@@ -321,7 +361,7 @@ describe('parseConfigDump', () => {
     const ids = rows.map(row => row.id)
     expect(ids).toContain('tool-subagent-codex')
     expect(ids).toContain('preset-standard')
-    expect(ids.length).toBe(19)
+    expect(ids.length).toBe(20)
     const nested = rows.find(row => row.id === 'tool-subagent-codex')
     expect(nested?.path).toEqual(['preset-standard', 'tool-subagent-codex'])
     expect(rows.find(row => row.id === 'web')?.path).toEqual(['web'])

@@ -187,7 +187,7 @@ describe('main: la CLI completa sobre el fixture', () => {
       expect(main([DUMP_PATH, CATALOG_PATH])).toBe(0)
       const report = io.out.join('')
       expect(report).toContain('# Informe de evidencia')
-      expect(report).toContain('## 9. Huella')
+      expect(report).toContain('## 10. Huella')
       expect(io.err).toEqual([])
     } finally {
       io.restore()
@@ -263,7 +263,7 @@ describe('glue de invocación directa', () => {
       const fresh = await freshCli('entry-directo')
       expect(typeof fresh.main).toBe('function')
       expect(process.exitCode).toBe(0)
-      expect(io.out.join('')).toContain('## 9. Huella')
+      expect(io.out.join('')).toContain('## 10. Huella')
     } finally {
       io.restore()
       process.argv = savedArgv

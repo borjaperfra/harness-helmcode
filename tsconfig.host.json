@@ -311,6 +311,7 @@
     { "path": "./packages/session/session-title-all-prompts-llm" },
     { "path": "./packages/session/session-turn-outline" },
     { "path": "./packages/identity/anonymous-user-id" },
+    { "path": "./packages/identity/identity-local" },
     { "path": "./packages/core/system-prompt" },
     { "path": "./packages/core/agent" },
     { "path": "./packages/core/agent-default-model" },

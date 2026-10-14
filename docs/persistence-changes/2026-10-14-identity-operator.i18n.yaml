@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-10-14-identity-operator.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Spanish blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-14-identity-operator.md
+/:
+  en: 3d5a424ae7d7e46b
+  es: 354e8770b8bd8621
+/2026-10-14-identity-operator:
+  en: c38cd130db6476c2
+  es: 949dc6b027697050
+/2026-10-14-identity-operator/summary:
+  en: ffb7415e21193704
+  es: 0e88d72e7654232f
+/2026-10-14-identity-operator/table-of-contents:
+  en: 6cf314a069ceb451
+  es: dabbc0fcbc05c776
+/2026-10-14-identity-operator/declaration:
+  en: 6907136f28e48c90
+  es: 19b18a160ca02442
+/2026-10-14-identity-operator/compatibility:
+  en: c5525b8529c09cdf
+  es: b8857907eb7535a3
+/2026-10-14-identity-operator/verification:
+  en: 5eef625a597fef18
+  es: 5f96fb2b717e1122
+/2026-10-14-identity-operator/dev-note:
+  en: b75c8458928b72b9
+  es: 79ce27846f061b12

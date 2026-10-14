@@ -1,5 +1,5 @@
 /**
- * Las nueve secciones del informe de evidencia: funciones puras, sin imports del
+ * Las diez secciones del informe de evidencia: funciones puras, sin imports del
  * harness, sin red y sin disco, para que cada una se pueda probar por separado
  * sobre un volcado ya parseado.
  *
@@ -107,7 +107,7 @@ export interface DumpRow {
   readonly value: DumpRecord
 }
 
-/** Títulos de las nueve secciones, en el orden obligatorio del informe. */
+/** Títulos de las diez secciones, en el orden obligatorio del informe. */
 export const SECTION_TITLES = [
   'Qué es este documento',
   'Rutas de inferencia declaradas',
@@ -115,6 +115,7 @@ export const SECTION_TITLES = [
   'Inventario de canales de salida',
   'Superficie de datos local',
   'Canal de redacción',
+  'Atribución',
   'Requisito de despliegue',
   'Inventario de plugins',
   'Huella',
@@ -125,6 +126,8 @@ const GUARD_ID = 'guard-eu-routing'
 const GUARD_NAME = '@deepseek-ai/dsh-guard-eu-routing'
 const PRIVACY_ID = 'privacy-helmcode'
 const PRIVACY_NAME = '@deepseek-ai/dsh-privacy-helmcode'
+const IDENTITY_ID = 'identity-local'
+const IDENTITY_NAME = '@deepseek-ai/dsh-identity-local'
 /** La referencia de credencial por defecto de la clave del mapa sellado. */
 const PRIVACY_DEFAULT_KEY_REF = 'PRIVACY_MAP_KEY'
 const MCP_CLIENT = '@deepseek-ai/dsh-mcp-client'
@@ -1020,7 +1023,70 @@ export function sectionRedactionChannel(input: EvidenceInput): string {
 }
 
 /* ------------------------------------------------------------------ */
-/* 7. Requisito de despliegue                                         */
+/* 7. Atribución                                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Sección 7: atribución de sesiones a un operador local. Declara si el volcado
+ * monta la fila `identity-local` y, si la trae, el `defaultOperator` que su fila
+ * declara —o la ausencia declarada de esa clave, sin rellenarla—, más la frase
+ * que importa: **esto es atribución, no autenticación**, y la atribución por
+ * sesión vive en el log de la sesión (el evento solo-log `identity/operator`),
+ * que un volcado de configuración no contiene.
+ * @param input - la entrada completa del informe.
+ * @returns el cuerpo de la sección 7.
+ */
+export function sectionAttribution(input: EvidenceInput): string {
+  const rows = dumpRows(input.dump)
+  const identity = rows.find(row => row.id === IDENTITY_ID || row.name === IDENTITY_NAME)
+  const lines: string[] = []
+  if (identity === undefined) {
+    lines.push(
+      `**La fila \`${IDENTITY_ID}\` NO aparece en el volcado compuesto.** Esta composición no atribuye sesiones a`,
+    )
+    lines.push(
+      'ningún operador: no hay ninguna fila que registre quién pilotó cada sesión. Se dice aquí, en vez de callarse.',
+    )
+    lines.push('')
+    lines.push(
+      'Impacto: sin atribución, el log de una sesión no permite responder «¿quién hizo esto?» más allá del usuario del',
+    )
+    lines.push('sistema operativo que arrancó el harness.')
+    return lines.join('\n')
+  }
+  const config = isRecord(identity.config) ? identity.config : {}
+  const declared = config['defaultOperator']
+  lines.push(`Fila \`${identity.id}\` (plugin \`${identity.name}\`), estado: ${rowState(identity.disabled)}.`)
+  lines.push('')
+  lines.push(
+    list([
+      declared === undefined
+        ? 'Operador por defecto: la fila **no declara `defaultOperator`**, así que las sesiones nacen sin atribuir y sólo el comando `/operator <nombre>` las atribuye'
+        : typeof declared === 'string'
+          ? `Operador por defecto: \`${declared}\` (declarado en la fila)`
+          : `Operador por defecto: la fila declara un valor que este informe no evalúa ni interpreta: \`${renderValue(declared)}\``,
+      'Atribución por sesión: vive en el **log de la sesión**, en el evento durable y solo-log `identity/operator` (fuera del transcript del modelo), y la lee la proyección de sesión `operator`. Este volcado no contiene logs de sesión, así que no puede decir a qué operador quedó atribuida ninguna sesión.',
+    ]),
+  )
+  lines.push('')
+  lines.push('**Esto es atribución, no autenticación**')
+  lines.push('')
+  lines.push(
+    list([
+      'el plugin no añade credencial, ni pregunta, ni puerta: quien tiene la URL de arranque sigue siendo el dueño del harness;',
+      'un operador puede atribuir una sesión a cualquier nombre, incluido el de otra persona: el log registra lo que se declaró, no quién lo declaró;',
+      'la atribución no separa usuarios en un mismo nodo ni limita lo que cada uno ve.',
+    ]),
+  )
+  lines.push('')
+  lines.push(
+    '_Alcance: esto es lo que el volcado declara. El informe no lee ningún log de sesión ni comprueba que la fila estuviera cargada en tiempo de ejecución._',
+  )
+  return lines.join('\n')
+}
+
+/* ------------------------------------------------------------------ */
+/* 8. Requisito de despliegue                                         */
 /* ------------------------------------------------------------------ */
 
 /**
@@ -1063,13 +1129,13 @@ export function sectionDeploymentRequirement(input: EvidenceInput): string {
 }
 
 /* ------------------------------------------------------------------ */
-/* 8. Inventario de plugins                                           */
+/* 9. Inventario de plugins                                           */
 /* ------------------------------------------------------------------ */
 
 /**
- * Sección 8: todas las filas del volcado con `id`, `name` y estado.
+ * Sección 9: todas las filas del volcado con `id`, `name` y estado.
  * @param input - la entrada completa del informe.
- * @returns el cuerpo de la sección 8.
+ * @returns el cuerpo de la sección 9.
  */
 export function sectionPluginInventory(input: EvidenceInput): string {
   const rows = dumpRows(input.dump)
@@ -1094,13 +1160,13 @@ export function sectionPluginInventory(input: EvidenceInput): string {
 }
 
 /* ------------------------------------------------------------------ */
-/* 9. Huella                                                          */
+/* 10. Huella                                                         */
 /* ------------------------------------------------------------------ */
 
 /**
- * Sección 9: fecha, versión y hash de entrada para reproducibilidad.
+ * Sección 10: fecha, versión y hash de entrada para reproducibilidad.
  * @param input - la entrada completa del informe.
- * @returns el cuerpo de la sección 9.
+ * @returns el cuerpo de la sección 10.
  */
 export function sectionFingerprint(input: EvidenceInput): string {
   return [
@@ -1121,9 +1187,9 @@ export function sectionFingerprint(input: EvidenceInput): string {
 /* ------------------------------------------------------------------ */
 
 /**
- * Las nueve secciones en el orden obligatorio, cada una con su título numerado.
+ * Las diez secciones en el orden obligatorio, cada una con su título numerado.
  * @param input - la entrada completa del informe.
- * @returns los nueve cuerpos, ya titulados con su número.
+ * @returns los diez cuerpos, ya titulados con su número.
  */
 export function buildSections(input: EvidenceInput): readonly string[] {
   const bodies = [
@@ -1133,6 +1199,7 @@ export function buildSections(input: EvidenceInput): readonly string[] {
     sectionEgressChannels(input),
     sectionLocalDataSurface(input),
     sectionRedactionChannel(input),
+    sectionAttribution(input),
     sectionDeploymentRequirement(input),
     sectionPluginInventory(input),
     sectionFingerprint(input),

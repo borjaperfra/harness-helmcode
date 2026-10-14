@@ -9,8 +9,8 @@
   en: e7c80d1de4d328b4
   es: a8f7a1fb0b5f817f
 /session-persistence-event-catalog/persistence-type-fingerprints:
-  en: 8dc2c5afdad7aa88
-  es: 6409a570929feba7
+  en: 74994b1cd788ac94
+  es: 1b61c35251f0a91e
 /session-persistence-event-catalog/event-envelope:
   en: 7ebb1a2e0dd1f916
   es: af5d2edb831e8641
@@ -113,6 +113,12 @@
 /session-persistence-event-catalog/events/hook/hook-result-log-only:
   en: 5479d86486adbc40
   es: 8ca312f84f69d168
+/session-persistence-event-catalog/events/identity:
+  en: a639a8b6844e3e47
+  es: a639a8b6844e3e47
+/session-persistence-event-catalog/events/identity/identity-operator-log-only:
+  en: 2924e6870d1cfe1a
+  es: 140e904b8d6f239b
 /session-persistence-event-catalog/events/image:
   en: 4378f94cd30a2ba8
   es: 4378f94cd30a2ba8
@@ -498,8 +504,11 @@
   en: 074796bd0f1328cb
   es: 074796bd0f1328cb
 /session-persistence-event-catalog/resolved-persistence-types/hooks-codex:
-  en: b9715e7b4ae357fc
-  es: b9715e7b4ae357fc
+  en: 40994317698024bf
+  es: 40994317698024bf
+/session-persistence-event-catalog/resolved-persistence-types/identity-operator:
+  en: cbe16b587ea819df
+  es: cbe16b587ea819df
 /session-persistence-event-catalog/resolved-persistence-types/image:
   en: 9b99fe6cfcc45e10
   es: 9b99fe6cfcc45e10
@@ -1269,9 +1278,12 @@
   en: f692844b29923b2e
   es: 8b503337dace0f46
 /session-persistence-event-catalog/resolved-persistence-types/union-2-variants~2:
-  en: 69d360cf5a1ae6b4
-  es: 810831b7afa910a3
+  en: edf023751f59885d
+  es: 4f652e5cbd5b9534
 /session-persistence-event-catalog/resolved-persistence-types/union-2-variants~3:
+  en: c95ea7de5bbbf785
+  es: 11c7bed154d89fe4
+/session-persistence-event-catalog/resolved-persistence-types/union-2-variants~4:
   en: 5a1af9849b0967ea
   es: 23b4696ed7b0b908
 /session-persistence-event-catalog/resolved-persistence-types/union-3-variants:
@@ -1308,8 +1320,11 @@
   en: a117573a5d58cb3c
   es: 02708dc5e9b96550
 /session-persistence-event-catalog/resolved-persistence-types/arguments-callid-name-step:
-  en: bbb8322870e4695e
-  es: 2f9db783a46f12b9
+  en: c5ee860c2630b802
+  es: 909260bf93addd75
+/session-persistence-event-catalog/resolved-persistence-types/at-operator:
+  en: bda8f876d69af5d2
+  es: cfdd6376b3e783dc
 /session-persistence-event-catalog/resolved-persistence-types/callid-files-turn:
   en: 5f4d3f66ed86a14d
   es: d6e7aeb951d8fd50
@@ -1872,8 +1887,11 @@
   en: 842db5f476294b7c
   es: 5d5210cb874b6afc
 /session-persistence-event-catalog/resolved-persistence-types/type-hook-result:
-  en: 8b523e0be5327519
-  es: 51f70169c046fb54
+  en: 66c6751fdca7605b
+  es: 5217e1d9f126796e
+/session-persistence-event-catalog/resolved-persistence-types/type-identity-operator:
+  en: e001955b43c97a91
+  es: 9ce96ee9756a42a0
 /session-persistence-event-catalog/resolved-persistence-types/type-image-offload:
   en: 06230b6290fa9826
   es: 2cad169efc481b83

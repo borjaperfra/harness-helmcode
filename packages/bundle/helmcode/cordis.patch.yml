@@ -183,3 +183,24 @@
         # sources:
         #   manual: docs/manual.md
         #   faq: docs/faq.md
+
+    # Identidad local: atribucion durable de cada sesion a un operador. NO es
+    # autenticacion: el plugin no anade credencial ni puerta, y quien tiene la URL
+    # de arranque sigue siendo el dueno del harness. Registra el comando host
+    # `/operator <nombre>` y el evento `identity/operator` (durable y solo-log:
+    # queda FUERA del transcript del modelo), pliega la proyeccion de sesion
+    # `operator` y expone `ctx.identityLocal`, que es lo que leen el export y el
+    # informe de evidencia. El estado sin operador es una ausencia declarada, no un
+    # valor por defecto adivinado.
+    #
+    # El OPERADOR POR DEFECTO lo pone el perfil del cliente, no este bundle
+    # compartido: quien es el operador de un despliegue es un dato del despliegue.
+    # Por eso la fila va sin `config` y las dos claves van comentadas aqui:
+    # `defaultOperator` siembra las sesiones que no registren su propio evento, y
+    # `requireOperator` avisa por el log del proceso (nunca bloquea el turno)
+    # cuando una sesion nace sin operador.
+    - id: identity-local
+      name: '@deepseek-ai/dsh-identity-local'
+      # config:
+      #   defaultOperator: <nombre del operador>
+      #   requireOperator: true

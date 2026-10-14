@@ -43,6 +43,7 @@ Las [referencias de formato](persistence-changes/historical-formats/README.es.md
 | `event:goal/change` | event | `763c8a20af487263a0080548274f7437ef4a86e0ba8769127d1ced10a72c664d` | [`{ type: "goal/change" }`](#persistence-type-sha256-763c8a20af487263a0080548274f7437ef4a86e0ba8769127d1ced10a72c664d) |
 | `event:hook/invoked` | event | `8a6e1ec9e8db346b0e02f027db73c07a94f067a26d40c1aef1abd09c47ce7ba0` | [`{ type: "hook/invoked" }`](#persistence-type-sha256-8a6e1ec9e8db346b0e02f027db73c07a94f067a26d40c1aef1abd09c47ce7ba0) |
 | `event:hook/result` | event | `e75916628f3f10c2d50658bd143052a46285fbf1a9a700ba54947614603d26b4` | [`{ type: "hook/result" }`](#persistence-type-sha256-e75916628f3f10c2d50658bd143052a46285fbf1a9a700ba54947614603d26b4) |
+| `event:identity/operator` | event | `9eb055ec1c85a7b11eb6268dc688d8fddd7a94a4bc61d8a3f697e758aef54867` | [`{ type: "identity/operator" }`](#persistence-type-sha256-9eb055ec1c85a7b11eb6268dc688d8fddd7a94a4bc61d8a3f697e758aef54867) |
 | `event:image/offload` | event | `b222069eea2d768065161c1147b1f2c78c1b54328c84b3586ae5c8f91b8ed35e` | [`{ type: "image/offload" }`](#persistence-type-sha256-b222069eea2d768065161c1147b1f2c78c1b54328c84b3586ae5c8f91b8ed35e) |
 | `event:llm/retry` | event | `525254db03b1d1e6b74cf55aced52817568331ac1f96c0818728910b6692e336` | [`{ type: "llm/retry" }`](#persistence-type-sha256-525254db03b1d1e6b74cf55aced52817568331ac1f96c0818728910b6692e336) |
 | `event:llm/retry-started` | event | `48e5c9861f16ac07e78cb7b5ae9dabdf7bb85c58baed5a51b4ad275050ea58e3` | [`{ type: "llm/retry-started" }`](#persistence-type-sha256-48e5c9861f16ac07e78cb7b5ae9dabdf7bb85c58baed5a51b4ad275050ea58e3) |
@@ -604,6 +605,29 @@ Fuente: [`packages/hooks/hook-protocol/src/types.ts:19`](../packages/hooks/hook-
 ```
 
 Fuente: [`packages/hooks/hook-protocol/src/types.ts:31`](../packages/hooks/hook-protocol/src/types.ts)
+
+### `identity/*`
+
+<a id="identityoperator--log-only"></a>
+
+#### `identity/operator` — log-only
+
+```ts persistence-catalog
+/**
+ * Records the session's operator as durable, log-only attribution. It is
+ * not a surface event, so it never enters the model transcript; a `null`
+ * operator is a RECORDED clear (the whole-value rule), not a missing fact,
+ * and it survives a profile that attributes a default operator.
+ */
+'identity/operator': {
+  /** The operator name to attribute, or `null` to clear the session's attribution. */
+  operator: string | null
+  /** ISO instant of the record, stored in the payload so the log owns it. */
+  at: string
+}
+```
+
+Fuente: [`packages/identity/identity-local/src/index.ts:46`](../packages/identity/identity-local/src/index.ts)
 
 ### `image/*`
 
@@ -1835,6 +1859,14 @@ SHA-256: `a9059a81430b320792bbb7c2ee1f8f6c77ff71e40ee44c18aec72e157c522694`
 SHA-256: `bb94f3217aa56c8876bbff0b8460d6a73cbead545659abb29e76cd0cf2cb92d6`
 
 `"hooks-codex"`
+
+<a id="persistence-type-sha256-64d6f42388779c6acfac2cf7948972cb880180e8041c501ebf0fb78cb2e05bb8"></a>
+
+### `"identity/operator"`
+
+SHA-256: `64d6f42388779c6acfac2cf7948972cb880180e8041c501ebf0fb78cb2e05bb8`
+
+`"identity/operator"`
 
 <a id="persistence-type-sha256-fb8b6a2e53cb9cf44c551176de0fb77d1ddc60037b99a891ff8a860b6d5c29a0"></a>
 
@@ -5294,6 +5326,17 @@ Uno de:
 - `"fork"`
 - `"fresh"`
 
+<a id="persistence-type-sha256-799231ac91869a6695666505343003905638e1b4d11349bff953d4dbfe3191ba"></a>
+
+### `union (2 variants)`
+
+SHA-256: `799231ac91869a6695666505343003905638e1b4d11349bff953d4dbfe3191ba`
+
+Uno de:
+
+- `null`
+- `string`
+
 <a id="persistence-type-sha256-9947aa5938fe19a895298da412917acbf9ffb5093a73ab8baa257e6ae9e63a07"></a>
 
 ### `union (2 variants)`
@@ -5456,6 +5499,19 @@ Fuentes: [`packages/core/session/src/types.ts:361`](../packages/core/session/src
 | `name` | obligatorio | `string` |
 | `step` | obligatorio | `number` |
 | `turn` | obligatorio | `number` |
+
+<a id="persistence-type-sha256-1ff36ac46a3c33f100ba41c158902732f91bf2749db5cea38a5fcb73c97692c4"></a>
+
+### `{ at, operator }`
+
+SHA-256: `1ff36ac46a3c33f100ba41c158902732f91bf2749db5cea38a5fcb73c97692c4`
+
+Fuentes: [`packages/identity/identity-local/src/index.ts:46`](../packages/identity/identity-local/src/index.ts)
+
+| Propiedad | Presencia | Tipo |
+|---|---|---|
+| `at` | obligatorio | `string` |
+| `operator` | obligatorio | [`union (2 variants)`](#persistence-type-sha256-799231ac91869a6695666505343003905638e1b4d11349bff953d4dbfe3191ba) |
 
 <a id="persistence-type-sha256-1528539c63db8b23506f0209a99ce77d8ad138adfbfcee3d4769b7382d93756c"></a>
 
@@ -7866,6 +7922,22 @@ SHA-256: `e75916628f3f10c2d50658bd143052a46285fbf1a9a700ba54947614603d26b4`
 | `seq` | obligatorio | `number` |
 | `time` | obligatorio | `number` |
 | `type` | obligatorio | `"hook/result"` |
+
+<a id="persistence-type-sha256-9eb055ec1c85a7b11eb6268dc688d8fddd7a94a4bc61d8a3f697e758aef54867"></a>
+
+<a id="persistence-type-eventidentityoperator"></a>
+
+### `{ type: "identity/operator" }`
+
+SHA-256: `9eb055ec1c85a7b11eb6268dc688d8fddd7a94a4bc61d8a3f697e758aef54867`
+
+| Propiedad | Presencia | Tipo |
+|---|---|---|
+| `data` | obligatorio | [`{ at, operator }`](#persistence-type-sha256-1ff36ac46a3c33f100ba41c158902732f91bf2749db5cea38a5fcb73c97692c4) |
+| `ignorable` | opcional | `true` |
+| `seq` | obligatorio | `number` |
+| `time` | obligatorio | `number` |
+| `type` | obligatorio | `"identity/operator"` |
 
 <a id="persistence-type-sha256-b222069eea2d768065161c1147b1f2c78c1b54328c84b3586ae5c8f91b8ed35e"></a>
 
