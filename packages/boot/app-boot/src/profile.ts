@@ -183,6 +183,18 @@ export const PROFILE_TEMPLATES: Record<string, ProfileTemplate> = {
   web: {
     bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@deepseek-ai/dsh-helmcode'],
   },
+  // The healthcare sector pack stacks AFTER the Helmcode layer: its two policy
+  // rows override, by id, rows that layer already mounted (`guard-eu-routing` to
+  // `eu-only` and `privacy-helmcode` to a seven-day map expiry), and its agent
+  // preset adds the two clinical skills from its own bundled skill root.
+  salud: {
+    bundles: [
+      '@deepseek-ai/dsh-base',
+      '@deepseek-ai/dsh-web-app',
+      '@deepseek-ai/dsh-helmcode',
+      '@deepseek-ai/dsh-helmcode-salud',
+    ],
+  },
   headless: {
     bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless'],
   },

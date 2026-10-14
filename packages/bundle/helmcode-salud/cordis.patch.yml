@@ -1,0 +1,49 @@
+# El pack sectorial de salud como capa de composicion propia. Un cliente de salud
+# lo activa (o no) en su perfil sin tocar la capa comun, y
+# `PROFILE_TEMPLATES.salud` lo apila DESPUES de `dsh-helmcode`, asi que las dos
+# entradas de abajo son overrides por id: reemplazan la config COMPLETA de la
+# fila que la capa Helmcode ya monto —`guard-eu-routing` con `mode: 'open'` y
+# `privacy-helmcode` con `ttlDays: 30`— en vez de insertar una segunda instancia
+# del mismo plugin. La fila objetivo existe siempre en este perfil porque la
+# plantilla del sector incluye las dos capas; si un perfil montara este pack sin
+# la capa Helmcode, el loader avisa `patch: entry <id> not found` y salta la
+# entrada, que es el lado visible del acoplamiento declarado.
+#
+# Marco: el dato de salud es una categoria especial (RGPD art. 9.1) y el Espacio
+# Europeo de Datos de Salud (EHDS) sostiene el acceso secundario sobre datos
+# seudonimizados. Las dos politicas de abajo son la postura de ese despliegue:
+# nada sale de la UE y el mapa que vuelve a juntar identificador y texto clinico
+# caduca en una semana.
+
+- id: guard-eu-routing
+  name: '@deepseek-ai/dsh-guard-eu-routing'
+  config:
+    # `eu-only` es LA politica del sector: residencia estricta. En este modo la
+    # guardia veta en el waterfall `llm/stream` toda ruta cuya residencia no sea
+    # exactamente `'eu'` —`'unknown'` tambien es un veto, no un valor neutro— y
+    # veta en `tools/pre-execute` las herramientas que abren su propio trafico
+    # (`web_fetch`, `web_search`, servidores MCP), que no pasan por ese
+    # waterfall. `'open'` es el modo correcto para la maquina de desarrollo, que
+    # no es un despliegue regulado; aqui el modo lo fija el tratamiento del dato
+    # del cliente, que es lo que un despliegue de salud declara. `residency` y
+    # `egressTools` no se declaran: la tabla por defecto del paquete YA es la
+    # lista blanca cerrada, y sumar entradas aqui solo ampliaria lo conocido.
+    mode: 'eu-only'
+
+- id: privacy-helmcode
+  name: '@deepseek-ai/dsh-privacy-helmcode'
+  config:
+    # El mapa que hace reversible la redaccion vive entre sesiones en
+    # `<DSH_HOME>/privacy/map.v1`, sellado con AES-256-GCM. `ttlDays: 7` acota la
+    # caducidad de las entradas NUEVAS a una semana: es la postura de retencion
+    # del sector, porque ese mapa es, por construccion, el unico artefacto del
+    # despliegue que vuelve a juntar un identificador con el texto clinico del
+    # que salio, y el RGPD art. 9 no admite conservarlo sin plazo. Una entrada
+    # caducada no se restaura (el mapa la niega); su marcador sigue en el
+    # historial, que es lo que mantiene el resumen legible sin reidentificar.
+    #
+    # La CLAVE no se declara aqui —este patch es un fichero compartido y en
+    # claro, y una clave en el seria una clave publicada—: vive en el credential
+    # store bajo `PRIVACY_MAP_KEY`. Sin esa credencial las dos herramientas
+    # fallan en vez de devolver texto sin redactar.
+    ttlDays: 7
