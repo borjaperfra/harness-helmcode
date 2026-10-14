@@ -161,12 +161,20 @@ function asString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined
 }
 
-/** `true` si el valor es un marcador de expresión `!!js` conservada. */
+/**
+ * `true` si el valor es un marcador de expresión `!!js` conservada.
+ * @param value - el valor leído del volcado.
+ * @returns `true` cuando el valor es un marcador `{ $js }` con texto.
+ */
 export function isVerbatimJs(value: unknown): value is VerbatimJs {
   return isRecord(value) && typeof value['$js'] === 'string'
 }
 
-/** Imprime un valor del volcado sin evaluarlo: `!!js` vuelve a su forma original. */
+/**
+ * Imprime un valor del volcado sin evaluarlo: `!!js` vuelve a su forma original.
+ * @param value - el valor leído del volcado.
+ * @returns su representación textual, literal para un marcador `!!js`.
+ */
 export function renderValue(value: unknown): string {
   if (value === undefined) return '(sin declarar)'
   if (isVerbatimJs(value)) return `!!js ${value.$js}`
@@ -226,12 +234,22 @@ export function dumpRows(dump: unknown): readonly DumpRow[] {
   return rows
 }
 
-/** Etiqueta de una fila: su `id`, con los ancestros delante cuando está anidada. */
+/**
+ * Etiqueta de una fila: su `id`, con los ancestros delante cuando está anidada.
+ * @param row - la fila del volcado.
+ * @returns la etiqueta de la fila, con sus ancestros unidos por ` › `.
+ */
 export function rowLabel(row: DumpRow): string {
   return row.path.join(' › ')
 }
 
-/** Residencia declarada de `proveedor/modelo`; sin entrada, `unknown`. */
+/**
+ * Residencia declarada de `proveedor/modelo`; sin entrada, `unknown`.
+ * @param table - la tabla de residencia que acompaña al volcado.
+ * @param provider - el proveedor de la ruta.
+ * @param model - el modelo de la ruta.
+ * @returns la residencia declarada, o `unknown` cuando no hay entrada.
+ */
 export function residencyOf(table: ResidencyTable, provider: string, model: string): Residency {
   const value = table[`${provider}/${model}`]
   return value === 'eu' || value === 'us' ? value : 'unknown'
@@ -409,7 +427,11 @@ export interface DeclaredWebSearch {
   readonly disabled: unknown
 }
 
-/** Proveedores de búsqueda web declarados (una fila por plugin `dsh-web-search-*`). */
+/**
+ * Proveedores de búsqueda web declarados (una fila por plugin `dsh-web-search-*`).
+ * @param rows - filas del volcado.
+ * @returns los proveedores declarados, en orden de documento.
+ */
 export function declaredWebSearch(rows: readonly DumpRow[]): readonly DeclaredWebSearch[] {
   const out: DeclaredWebSearch[] = []
   for (const row of rows) {
@@ -432,6 +454,8 @@ export function declaredWebSearch(rows: readonly DumpRow[]): readonly DeclaredWe
 /**
  * Sección 1: identidad del documento, fecha, versión, hash de entrada y la
  * advertencia literal que impide leer el inventario como prueba de egreso.
+ * @param input - la entrada completa del informe.
+ * @returns el cuerpo de la sección 1.
  */
 export function sectionWhatThisIs(input: EvidenceInput): string {
   return [
@@ -463,6 +487,8 @@ export function sectionWhatThisIs(input: EvidenceInput): string {
 /**
  * Sección 2: por proveedor declarado, `baseURL`, modelos y residencia declarada.
  * Los modelos sin residencia conocida se imprimen como `unknown`.
+ * @param input - la entrada completa del informe.
+ * @returns el cuerpo de la sección 2.
  */
 export function sectionInferenceRoutes(input: EvidenceInput): string {
   const providers = declaredProviders(dumpRows(input.dump))
@@ -528,6 +554,8 @@ export function sectionInferenceRoutes(input: EvidenceInput): string {
  * Sección 3: lee la fila `guard-eu-routing` del volcado. `open` produce el banner
  * literal; `eu-only` enumera lo que veta y lo que no cubre; la ausencia de la fila
  * se declara en vez de callarse.
+ * @param input - la entrada completa del informe.
+ * @returns el cuerpo de la sección 3.
  */
 export function sectionResidencyMode(input: EvidenceInput): string {
   const rows = dumpRows(input.dump)
@@ -613,6 +641,8 @@ export function sectionResidencyMode(input: EvidenceInput): string {
 /**
  * Sección 4: rutas LLM, servidores MCP, búsqueda web, `web_fetch`, subagentes
  * externos, canal de actualizaciones y telemetría (estado y método de comprobación).
+ * @param input - la entrada completa del informe.
+ * @returns el cuerpo de la sección 4.
  */
 export function sectionEgressChannels(input: EvidenceInput): string {
   const rows = dumpRows(input.dump)
@@ -782,6 +812,8 @@ export function sectionEgressChannels(input: EvidenceInput): string {
 /**
  * Sección 5: log de sesión, copias de checkpoint, spill, credenciales en claro y
  * exportación del log sin redacción.
+ * @param input - la entrada completa del informe.
+ * @returns el cuerpo de la sección 5.
  */
 export function sectionLocalDataSurface(input: EvidenceInput): string {
   const rows = dumpRows(input.dump)
@@ -886,6 +918,8 @@ export function sectionLocalDataSurface(input: EvidenceInput): string {
  * que ese canal acepta —lo que sale hacia el modelo lleva marcadores y el
  * ORIGINAL se queda en el log local—, dónde vive el mapa sellado, que la
  * restauración es manual y qué hace el canal cuando el mapa no se puede abrir.
+ * @param input - la entrada completa del informe.
+ * @returns el cuerpo de la sección 6.
  */
 export function sectionRedactionChannel(input: EvidenceInput): string {
   const rows = dumpRows(input.dump)
@@ -989,7 +1023,11 @@ export function sectionRedactionChannel(input: EvidenceInput): string {
 /* 7. Requisito de despliegue                                         */
 /* ------------------------------------------------------------------ */
 
-/** Sección 7: para attestar egreso hace falta control de salida del despliegue. */
+/**
+ * Sección 7: para attestar egreso hace falta control de salida del despliegue.
+ * @param input - la entrada completa del informe.
+ * @returns el cuerpo de la sección 7.
+ */
 export function sectionDeploymentRequirement(input: EvidenceInput): string {
   const rows = dumpRows(input.dump)
   const hasProxyPlugin = rows.some(row => row.name === '@deepseek-ai/dsh-http-proxy')
@@ -1028,7 +1066,11 @@ export function sectionDeploymentRequirement(input: EvidenceInput): string {
 /* 8. Inventario de plugins                                           */
 /* ------------------------------------------------------------------ */
 
-/** Sección 8: todas las filas del volcado con `id`, `name` y estado. */
+/**
+ * Sección 8: todas las filas del volcado con `id`, `name` y estado.
+ * @param input - la entrada completa del informe.
+ * @returns el cuerpo de la sección 8.
+ */
 export function sectionPluginInventory(input: EvidenceInput): string {
   const rows = dumpRows(input.dump)
   const lines: string[] = []
@@ -1055,7 +1097,11 @@ export function sectionPluginInventory(input: EvidenceInput): string {
 /* 9. Huella                                                          */
 /* ------------------------------------------------------------------ */
 
-/** Sección 9: fecha, versión y hash de entrada para reproducibilidad. */
+/**
+ * Sección 9: fecha, versión y hash de entrada para reproducibilidad.
+ * @param input - la entrada completa del informe.
+ * @returns el cuerpo de la sección 9.
+ */
 export function sectionFingerprint(input: EvidenceInput): string {
   return [
     list([
@@ -1074,7 +1120,11 @@ export function sectionFingerprint(input: EvidenceInput): string {
 /* Composición                                                        */
 /* ------------------------------------------------------------------ */
 
-/** Las nueve secciones en el orden obligatorio, cada una con su título numerado. */
+/**
+ * Las nueve secciones en el orden obligatorio, cada una con su título numerado.
+ * @param input - la entrada completa del informe.
+ * @returns los nueve cuerpos, ya titulados con su número.
+ */
 export function buildSections(input: EvidenceInput): readonly string[] {
   const bodies = [
     sectionWhatThisIs(input),

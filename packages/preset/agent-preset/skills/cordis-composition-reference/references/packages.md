@@ -66,6 +66,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-client-ui-agent-preset` | no | Agent-preset surfaces: the default for later sessions, this session's seat, and the composition editor |
 | `@deepseek-ai/dsh-client-ui-approval` | no | Approval composer takeover over the scoped Remote Event waterfall |
 | `@deepseek-ai/dsh-client-ui-attachment` | no | Dynamic attachment presentation plugin for conversation input, message-image, and trajectory image slots |
+| `@deepseek-ai/dsh-client-ui-brand-helmcode` | no | Helmcode brand skin for the Web client: brand indigo palette, square corners, Roboto typography and the Helmcode lockup |
 | `@deepseek-ai/dsh-client-ui-brand-official` | no | Official DeepSeek Harness brand occupants for the Web client's sidebar slots |
 | `@deepseek-ai/dsh-client-ui-chat` | no | Chat Conversation target, node definitions, renderers, and details surface |
 | `@deepseek-ai/dsh-client-ui-commands` | no | Client command surface: global directory cache, '/' source, three command UI kinds, popupSelect registry |
@@ -236,6 +237,8 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 
 | Package | Config | Description |
 |---|---|---|
+| `@deepseek-ai/dsh-guard-eu-routing` | yes | Residency and egress guard for the DeepSeek Harness: which model routes may leave the EU, which tools carry their own egress outside the llm/stream waterfall, and why the guard refuses instead of degrading or asking in silence |
+| `@deepseek-ai/dsh-privacy-helmcode` | yes | Redaccion reversible de PII espanola para el DeepSeek Harness: detectores con checksum real, mapa determinista persistible y sellado cifrado con fallo cerrado |
 | `@deepseek-ai/dsh-repeat-tool-reminder` | yes | Repeat-tool-call guard plugin: advisory reminders when an agent loops on identical tool calls |
 | `@deepseek-ai/dsh-tool-call-timeout-policy` | no | Tool-call timeout policy: a tools/execute wrapper that arms a per-tool deadline on exec.signal and returns TOOL_TIMEOUT when it wins |
 
@@ -324,6 +327,12 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | Package | Config | Description |
 |---|---|---|
 | `@deepseek-ai/dsh-ptc-runtime-node` | yes | Sandboxed Node process implementation of the DeepSeek Harness PTC execution capability |
+
+## retrieval
+
+| Package | Config | Description |
+|---|---|---|
+| `@deepseek-ai/dsh-retrieval-helmcode` | yes | Recuperacion para Helmcode: nucleo puro (troceador, embedder qwen3-embedding, rerank e indice local) y su cableado como seam ctx.retrieval con las herramientas index_workspace y knowledge_search |
 
 ## runtime-diagnostics
 

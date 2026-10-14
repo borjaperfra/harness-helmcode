@@ -860,6 +860,8 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   BashEnvVariableInfo: 'service-local metadata type is owned by packages/shell/tool-bash/src/index.ts',
   CompactionAgentContext: 'compaction service input is owned by packages/compaction/compaction/src/index.ts',
   ManualCompactAgentContext: 'manual compaction service input is owned by packages/compaction/compaction/src/index.ts',
+  SourceIndexOutcome: 'retrieval indexing outcome is owned by packages/retrieval/helmcode/src/index.ts',
+  SearchOutcome: 'retrieval search outcome is owned by packages/retrieval/helmcode/src/index.ts',
   ClientResponse: 'wire response message is owned by packages/client/connection/src/rpc.ts',
   ApprovalRequestId: 'dynamic Plugin approval identity is owned by packages/extensions/cordis-host-runner/src/types.ts',
   CordisErrorDetails: 'Cordis runtime error payload is owned by packages/extensions/cordis-host-runner/src/types.ts',

@@ -77,6 +77,7 @@ export function seal(plaintext: string, password: string): string {
  *
  * @param sealed - el sobre versionado.
  * @param password - la contrasena del perfil.
+ * @returns el texto plano que se sello.
  * @throws SealError si el sobre no tiene la forma, la version no es conocida o
  * la etiqueta de autenticacion no valida.
  */

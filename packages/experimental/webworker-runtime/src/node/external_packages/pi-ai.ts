@@ -77,6 +77,7 @@ export function getBuiltinModels(): unknown[] {
  * `llm-pi-ai/models.ts`. Returns an empty mutable collection: the worker
  * deployment ships no providers, and request paths stay loud through the
  * wire-protocol stubs above.
+ * @param _options - the caller's catalog options; this stub reads none of them.
  * @returns an empty Models/MutableModels stand-in.
  */
 export function builtinModels(_options?: unknown): unknown {
@@ -109,14 +110,23 @@ function loudWireApi(symbol: string): unknown {
   }
 }
 
-/** Anthropic messages API binding: mounts, requests fail loud. */
-export const anthropicMessagesApi = () => loudWireApi('anthropicMessagesApi')
+/**
+ * Anthropic messages API binding: mounts, requests fail loud.
+ * @returns the stand-in Api object whose request path throws.
+ */
+export const anthropicMessagesApi: () => unknown = () => loudWireApi('anthropicMessagesApi')
 
-/** OpenAI completions API binding: mounts, requests fail loud. */
-export const openAICompletionsApi = () => loudWireApi('openAICompletionsApi')
+/**
+ * OpenAI completions API binding: mounts, requests fail loud.
+ * @returns the stand-in Api object whose request path throws.
+ */
+export const openAICompletionsApi: () => unknown = () => loudWireApi('openAICompletionsApi')
 
-/** OpenAI responses API binding: mounts, requests fail loud. */
-export const openAIResponsesApi = () => loudWireApi('openAIResponsesApi')
+/**
+ * OpenAI responses API binding: mounts, requests fail loud.
+ * @returns the stand-in Api object whose request path throws.
+ */
+export const openAIResponsesApi: () => unknown = () => loudWireApi('openAIResponsesApi')
 
 /** CommonJS interop marker: the worker loader hands `default` to default imports. */
 export const __esModule = true

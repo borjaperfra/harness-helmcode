@@ -229,7 +229,11 @@ export function redactionEvidence(
   }
 }
 
-/** Versión del generador, leída del `package.json` del paquete. */
+/**
+ * Versión del generador, leída del `package.json` del paquete.
+ * @returns la versión declarada por el paquete que genera el informe.
+ * @throws cuando el `package.json` no declara una versión legible.
+ */
 export function generatorVersion(): string {
   const document: unknown = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
   if (isRecord(document) && typeof document['version'] === 'string') return document['version']

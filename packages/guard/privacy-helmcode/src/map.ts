@@ -262,6 +262,7 @@ export class RedactionMap {
    * Busca la entrada de un valor.
    *
    * @param value - el valor original.
+   * @returns la entrada acunada para ese valor, o `undefined` si no la hay.
    */
   lookup(value: string): RedactionMapEntry | undefined {
     return this.byValue.get(value)
@@ -272,6 +273,7 @@ export class RedactionMap {
    *
    * @param placeholder - el marcador a resolver.
    * @param now - el instante contra el que se comprueba la caducidad.
+   * @returns la entrada vigente del marcador.
    * @throws UnknownPlaceholderError si el marcador no esta en el mapa.
    * @throws ExpiredEntryError si su caducidad ya paso.
    */
@@ -288,6 +290,8 @@ export class RedactionMap {
   /**
    * Serializa el mapa a JSON estable: entradas ordenadas por marcador y claves
    * siempre en el mismo orden, para que el fichero persistido sea reproducible.
+   *
+   * @returns el documento JSON del mapa, terminado en salto de linea.
    */
   toJSON(): string {
     const ordered = [...this.byPlaceholder.values()].sort(comparePlaceholders)
@@ -305,6 +309,7 @@ export class RedactionMap {
    * Carga un mapa serializado por {@link RedactionMap.toJSON}.
    *
    * @param json - el documento persistido.
+   * @returns el mapa con las entradas del documento.
    * @throws CorruptMapError si el documento no tiene la forma declarada.
    */
   static parse(json: string): RedactionMap {

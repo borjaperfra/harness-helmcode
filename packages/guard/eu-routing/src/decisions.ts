@@ -120,7 +120,12 @@ export type EgressDecision =
     code: 'EGRESS_TOOL_DENIED' | 'RESIDENCY_REFUSED' | 'MODE_OPEN_BUT_UNCLASSIFIED'
   }
 
-/** La clave de la tabla de residencia: `provider + '/' + model`. */
+/**
+ * La clave de la tabla de residencia: `provider + '/' + model`.
+ * @param provider - el id del proveedor de la ruta.
+ * @param model - el id del modelo de la ruta.
+ * @returns la clave con la que se consulta la tabla.
+ */
 export function routeKey(provider: string, model: string): string {
   return `${provider}/${model}`
 }

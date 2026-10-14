@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-retrieval-helmcode",
-  "description": "Nucleo puro de recuperacion para Helmcode: troceador consciente de parrafos, clientes de embeddings (qwen3-embedding) y rerank con fetch inyectable, e indice local que ordena candidatos por coseno en JS",
+  "description": "Recuperacion para Helmcode: nucleo puro (troceador, embedder qwen3-embedding, rerank e indice local) y su cableado como seam ctx.retrieval con las herramientas index_workspace y knowledge_search",
   "version": "0.1.0",
   "publishConfig": {
     "access": "public"
@@ -55,7 +55,26 @@
     "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
-  "peerDependencies": {},
-  "dependencies": {},
-  "devDependencies": {}
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "workspace:~",
+    "@deepseek-ai/dsh-credentials": "workspace:*",
+    "@deepseek-ai/dsh-fs": "workspace:*",
+    "@deepseek-ai/dsh-home-paths": "workspace:*",
+    "@deepseek-ai/dsh-llm": "workspace:*",
+    "@deepseek-ai/dsh-tools": "workspace:*"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "workspace:~"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "workspace:~",
+    "@deepseek-ai/dsh-credentials": "workspace:*",
+    "@deepseek-ai/dsh-credentials-local": "workspace:*",
+    "@deepseek-ai/dsh-fs": "workspace:*",
+    "@deepseek-ai/dsh-fs-local": "workspace:*",
+    "@deepseek-ai/dsh-home-paths": "workspace:*",
+    "@deepseek-ai/dsh-llm": "workspace:*",
+    "@deepseek-ai/dsh-system-prompt": "workspace:*",
+    "@deepseek-ai/dsh-tools": "workspace:*"
+  }
 }

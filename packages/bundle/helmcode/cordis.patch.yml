@@ -1,6 +1,7 @@
 # The Helmcode layer as its own profile bundle: the brand skin, the European
-# inference route, the residency and egress guard, and the PII redaction
-# channel, inserted over the composition `dsh-web-app` leaves behind.
+# inference route, the residency and egress guard, the PII redaction channel, and
+# the retrieval index behind the `ctx.retrieval` seam, inserted over the
+# composition `dsh-web-app` leaves behind.
 # `PROFILE_TEMPLATES.web` stacks this bundle after `dsh-web-app`, so both rows
 # join the same roster without a Helmcode line in any upstream patch file.
 
@@ -152,3 +153,33 @@
       name: '@deepseek-ai/dsh-privacy-helmcode'
       config:
         ttlDays: 30
+
+    # Recuperacion: el indice local y las dos herramientas que lo usan
+    # (`index_workspace` y `knowledge_search`). El plugin declara y provee el seam
+    # `ctx.retrieval`, y su nucleo puro no tiene ningun camino de red por defecto:
+    # el cableado le inyecta `globalThis.fetch` explicitamente.
+    #
+    # EGRESO: las dos herramientas llaman a https://api.helmcode.com/v1 (los
+    # endpoints `/v1/embeddings` con el modelo qwen3-embedding y `/v1/rerank`) y
+    # sus descripciones lo declaran, porque es una salida que el waterfall
+    # `llm/stream` no ve. El procesamiento es de residencia europea.
+    #
+    # La CLAVE no se declara aqui —este patch es compartido y en claro—: vive en el
+    # credential store bajo la referencia `HELMCODE_API_KEY` (el campo `apiKeyRef`
+    # existe para apuntar a otra). Sin esa credencial, o si Helmcode contesta
+    # 401/402, las dos herramientas FALLAN con el codigo y la causa en vez de
+    # devolver resultados sin recuperacion real; un documento sin texto es un no-op
+    # declarado, no un error.
+    #
+    # El indice vive en `<DSH_HOME>/retrieval/index.sqlite` por defecto y `sources`
+    # declara los documentos que `index_workspace` recorre (nombre logico → ruta
+    # relativa al workspace de la sesion). El ejemplo va comentado porque las rutas
+    # son del despliegue, no del bundle:
+    - id: retrieval-helmcode
+      name: '@deepseek-ai/dsh-retrieval-helmcode'
+      config:
+        topK: 8
+        topN: 4
+        # sources:
+        #   manual: docs/manual.md
+        #   faq: docs/faq.md

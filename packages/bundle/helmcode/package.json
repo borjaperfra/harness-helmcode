@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-helmcode",
-  "description": "the Helmcode layer as a profile bundle: the brand skin, the European inference route, the residency and egress guard, and the PII redaction channel",
+  "description": "the Helmcode layer as a profile bundle: the brand skin, the European inference route, the residency and egress guard, the PII redaction channel, and the retrieval index behind the ctx.retrieval seam",
   "version": "0.1.0",
   "publishConfig": {
     "access": "public"
@@ -37,7 +37,8 @@
     "@deepseek-ai/dsh-client-ui-brand-helmcode": "workspace:*",
     "@deepseek-ai/dsh-guard-eu-routing": "workspace:*",
     "@deepseek-ai/dsh-llm-pi-ai": "workspace:*",
-    "@deepseek-ai/dsh-privacy-helmcode": "workspace:*"
+    "@deepseek-ai/dsh-privacy-helmcode": "workspace:*",
+    "@deepseek-ai/dsh-retrieval-helmcode": "workspace:*"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~"

@@ -2405,6 +2405,46 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-repeat-tool-reminder -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-retrieval-helmcode -->
+<a id="deepseek-aidsh-retrieval-helmcode"></a>
+
+## `@deepseek-ai/dsh-retrieval-helmcode`
+
+- `inject`: `tools` · `credentials`
+- `source`: [`packages/retrieval/helmcode/src/index.ts:100`](../packages/retrieval/helmcode/src/index.ts)
+
+```ts config-catalog
+/** La configuracion del plugin, tal como la declara el perfil. */
+export interface Config {
+  /**
+   * Ruta del fichero del indice. Ausente: `<DSH_HOME>/retrieval/index.sqlite`,
+   * resuelto con `resolveDshHome` en el momento de montar el plugin.
+   */
+  indexPath?: string
+  /**
+   * Referencia de credencial que guarda la clave de Helmcode. Ausente:
+   * `HELMCODE_API_KEY`. La clave no se declara aqui: vive en el credential store.
+   */
+  apiKeyRef?: string
+  /**
+   * Raiz de la API de Helmcode, SIN `/v1` (el nucleo anade `/v1/embeddings` y
+   * `/v1/rerank`). Ausente: `https://api.helmcode.com`, la ruta europea.
+   */
+  baseURL?: string
+  /**
+   * Los documentos que `index_workspace` indexa cuando el modelo no limita la
+   * lista: nombre logico (el que la busqueda cita como `source`) → ruta relativa
+   * al workspace de la sesion. Ausente: ninguno.
+   */
+  sources?: Record<string, string>
+  /** Candidatos que la busqueda pide al coseno. Ausente: {@link DEFAULT_TOP_K}. */
+  topK?: number
+  /** Resultados que la busqueda devuelve tras el rerank. Ausente: {@link DEFAULT_TOP_N}. */
+  topN?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-retrieval-helmcode -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-sandbox-local -->
 <a id="deepseek-aidsh-sandbox-local"></a>
 
