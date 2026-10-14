@@ -408,6 +408,8 @@
     { "path": "./packages/bundle/base" },
     { "path": "./packages/bundle/headless" },
     { "path": "./packages/bundle/helmcode-salud" },
+    { "path": "./packages/bundle/helmcode-legal/tsconfig.host.json" },
+    { "path": "./packages/bundle/helmcode-banca/tsconfig.host.json" },
     { "path": "./packages/bundle/sdk-app" },
     { "path": "./packages/bundle/sdk-minimal" },
     { "path": "./packages/bundle/web-app" },

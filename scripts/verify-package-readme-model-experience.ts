@@ -228,6 +228,8 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/llm/quota-helmcode': { kind: 'none', reason: 'A frozen limits table plus pure decision functions; the meter and any model-facing tool are consumers that arrive on top of it.' },
   'packages/identity/identity-local': { kind: 'none', reason: 'Attribution is a log-only session event: the package registers no prompt, tool or model-visible surface.' },
   'packages/bundle/helmcode-salud': { kind: 'indirect', reason: 'The pack is a patch carrier over the Helmcode layer: it overrides two of that layer\'s rows and adds a skill root, and each of those owners keeps its own model-facing contribution.' },
+  'packages/bundle/helmcode-legal': { kind: 'indirect', reason: 'The pack is a patch carrier over the Helmcode layer: it overrides two of that layer\'s rows, adds a skill root and registers one browser-side sector chip, and each of those owners keeps its own model-facing contribution.' },
+  'packages/bundle/helmcode-banca': { kind: 'indirect', reason: 'The pack is a patch carrier over the Helmcode layer: it overrides two of that layer\'s rows, adds a skill root and registers one browser-side sector chip, and each of those owners keeps its own model-facing contribution.' },
 }
 
 interface Failure {

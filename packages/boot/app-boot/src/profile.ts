@@ -195,6 +195,31 @@ export const PROFILE_TEMPLATES: Record<string, ProfileTemplate> = {
       '@deepseek-ai/dsh-helmcode-salud',
     ],
   },
+  // The legal sector pack stacks the same four layers in the same order: its
+  // policy rows override, by id, the two rows the Helmcode layer mounted
+  // (`guard-eu-routing` to `eu-only` and `privacy-helmcode` to a three-day map
+  // expiry), its agent preset adds the two legal skills from its own bundled
+  // skill root, and its own row mounts the sector chip in the session header.
+  legal: {
+    bundles: [
+      '@deepseek-ai/dsh-base',
+      '@deepseek-ai/dsh-web-app',
+      '@deepseek-ai/dsh-helmcode',
+      '@deepseek-ai/dsh-helmcode-legal',
+    ],
+  },
+  // The banking sector pack stacks the same four layers: `guard-eu-routing` to
+  // `eu-only` (DORA and residency), `privacy-helmcode` to a thirty-day map
+  // expiry (the sector's regulatory window), the two compliance skills, and the
+  // sector chip.
+  banca: {
+    bundles: [
+      '@deepseek-ai/dsh-base',
+      '@deepseek-ai/dsh-web-app',
+      '@deepseek-ai/dsh-helmcode',
+      '@deepseek-ai/dsh-helmcode-banca',
+    ],
+  },
   headless: {
     bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless'],
   },

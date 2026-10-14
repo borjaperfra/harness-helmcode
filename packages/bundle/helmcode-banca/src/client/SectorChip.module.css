@@ -1,0 +1,35 @@
+/* Session-header sector chip: static chrome naming the sector pack this
+   profile composes. Passive by construction — the chip reports a fact about
+   the deployment, it is not a control. */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: var(--dsw-radius-xs);
+  background: var(--dsw-alias-fill-tsp-secondary);
+  font-size: 12px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+}
+
+.chip::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dsw-alias-label-tertiary);
+  opacity: 0.7;
+}
+
+/* First sacrifice when the header runs out of width: the sector is deployment
+   chrome, so it yields before any interactive utility entry. */
+@container (max-width: 540px) {
+  .chip {
+    display: none;
+  }
+}

@@ -385,6 +385,8 @@
       "@deepseek-ai/dsh-goal-round-driver/invariant": ["./packages/goal/goal-round-driver/src/invariant.ts"],
       "@deepseek-ai/dsh-headless": ["./packages/bundle/headless/src"],
       "@deepseek-ai/dsh-helmcode": ["./packages/bundle/helmcode/src"],
+      "@deepseek-ai/dsh-helmcode-banca": ["./packages/bundle/helmcode-banca/src"],
+      "@deepseek-ai/dsh-helmcode-legal": ["./packages/bundle/helmcode-legal/src"],
       "@deepseek-ai/dsh-helmcode-salud": ["./packages/bundle/helmcode-salud/src"],
       "@deepseek-ai/dsh-home-paths": ["./packages/util/home-paths/src"],
       "@deepseek-ai/dsh-hook-protocol": ["./packages/hooks/hook-protocol/src"],

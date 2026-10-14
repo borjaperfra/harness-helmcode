@@ -1,0 +1,67 @@
+# El pack sectorial de banca como capa de composicion propia. Una entidad lo
+# activa (o no) en su perfil sin tocar la capa comun, y
+# `PROFILE_TEMPLATES.banca` lo apila DESPUES de `dsh-helmcode`, asi que las dos
+# entradas de abajo son overrides por id: reemplazan la config COMPLETA de la
+# fila que la capa Helmcode ya monto —`guard-eu-routing` con `mode: 'open'` y
+# `privacy-helmcode` con `ttlDays: 30`— en vez de insertar una segunda instancia
+# del mismo plugin. La fila objetivo existe siempre en este perfil porque la
+# plantilla del sector incluye las dos capas; si un perfil montara este pack sin
+# la capa Helmcode, el loader avisa `patch: entry <id> not found` y salta la
+# entrada, que es el lado visible del acoplamiento declarado.
+#
+# Marco: DORA (Reglamento (UE) 2022/2554) hace al consejo responsable de la
+# resiliencia operativa digital y obliga a gobernar el riesgo de TERCEROS
+# proveedores de servicios TIC, con un registro de informacion y una vigilancia
+# proporcionada a la criticidad; NIS2 (Directiva (UE) 2022/2555) anade las
+# obligaciones de gestion de riesgos y notificacion sobre las entidades
+# financieras y sus proveedores; y el RGPD sigue gobernando los datos personales
+# que esas operaciones tratan. Las dos politicas de abajo son la postura de ese
+# despliegue: el expediente se trata solo en la UE, y el mapa que vuelve a juntar
+# identificador y texto caduca a los treinta dias.
+
+- id: guard-eu-routing
+  name: '@deepseek-ai/dsh-guard-eu-routing'
+  config:
+    # `eu-only` es LA politica del sector: residencia estricta, por DORA y por el
+    # RGPD a la vez. En este modo la guardia veta en el waterfall `llm/stream`
+    # toda ruta cuya residencia no sea exactamente `'eu'` —`'unknown'` tambien es
+    # un veto, no un valor neutro— y veta en `tools/pre-execute` las herramientas
+    # que abren su propio trafico (`web_fetch`, `web_search`, servidores MCP), que
+    # no pasan por ese waterfall. Un expediente de cumplimiento no sale del
+    # Espacio Economico Europeo. `residency` y `egressTools` no se declaran: la
+    # tabla por defecto del paquete YA es la lista blanca cerrada, y sumar
+    # entradas aqui solo ampliaria lo conocido.
+    mode: 'eu-only'
+
+- id: privacy-helmcode
+  name: '@deepseek-ai/dsh-privacy-helmcode'
+  config:
+    # El mapa que hace reversible la redaccion vive entre sesiones en
+    # `<DSH_HOME>/privacy/map.v1`, sellado con AES-256-GCM. `ttlDays: 30` acota la
+    # caducidad de las entradas NUEVAS a treinta dias: es la postura de retencion
+    # del sector y es MAS LARGA que la de salud (siete dias). La razon es el ciclo
+    # regulatorio, no un descuido: un analisis DORA se sostiene sobre evidencia
+    # que se revisa y se vuelve a citar durante el trimestre —registro de
+    # informacion, informes de un proveedor critico, plan de continuidad—, y el
+    # mapa es el unico artefacto del despliegue que vuelve a juntar un
+    # identificador con el texto del que salio, asi que su plazo es el del
+    # expediente que lo justifica. Una entrada caducada no se restaura (el mapa la
+    # niega); su marcador sigue en el historial, que es lo que mantiene el informe
+    # legible sin reidentificar.
+    #
+    # La CLAVE no se declara aqui —este patch es un fichero compartido y en
+    # claro, y una clave en el seria una clave publicada—: vive en el credential
+    # store bajo `PRIVACY_MAP_KEY`. Sin esa credencial las dos herramientas
+    # fallan en vez de devolver texto sin redactar.
+    ttlDays: 30
+
+# El chip de sector: la fila host que monta este mismo paquete. Su mitad de
+# navegador (`dsh.client` en el manifiesto, `./client` en `exports`) registra la
+# cadena del sector en su propio namespace de locale y ocupa
+# `conversation.session.header.utilities` con el chip que dice al operador que
+# esta sesion corre bajo el pack de banca. La mitad host no hace nada mas que
+# existir: sin fila no hay entrada en el arbol del Loader, y sin entrada el
+# roster de navegador no sirve el bundle del chip.
+- insert:
+    - id: sector-banca
+      name: '@deepseek-ai/dsh-helmcode-banca'

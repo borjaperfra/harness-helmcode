@@ -201,6 +201,8 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   // The sector pack's bundled skill root is resolved from the installed package
   // by the preset's own skill-filesystem instance, so it must ship with it.
   '@deepseek-ai/dsh-helmcode-salud': ['skills'],
+  '@deepseek-ai/dsh-helmcode-legal': ['skills'],
+  '@deepseek-ai/dsh-helmcode-banca': ['skills'],
   // The Web Host mounts the default-off settings owner independently of each
   // Agent-scoped delegation-tool instance.
   '@deepseek-ai/dsh-tool-subagent': ['lib/model-selection-settings.js'],

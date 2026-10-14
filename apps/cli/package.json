@@ -45,6 +45,8 @@
     "@deepseek-ai/dsh-goal-round-driver": "workspace:*",
     "@deepseek-ai/dsh-headless": "workspace:*",
     "@deepseek-ai/dsh-helmcode": "workspace:*",
+    "@deepseek-ai/dsh-helmcode-banca": "workspace:*",
+    "@deepseek-ai/dsh-helmcode-legal": "workspace:*",
     "@deepseek-ai/dsh-helmcode-salud": "workspace:*",
     "@deepseek-ai/dsh-home-paths": "workspace:*",
     "@deepseek-ai/dsh-hooks-claude-code": "workspace:*",

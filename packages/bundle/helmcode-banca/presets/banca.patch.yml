@@ -1,0 +1,115 @@
+# Preset de agente del sector banca: una declaracion de
+# `@deepseek-ai/dsh-agent-preset` insertada despues del patch del bundle. Es el
+# preset que un analista de cumplimiento selecciona, y su lista de herramientas
+# es la RESTRINGIDA del sector: la superficie del turno es la del trabajo con
+# expedientes de cumplimiento y nada mas.
+#
+# LAS CAPACIDADES DE PRIVACIDAD Y RECUPERACION ESTAN DENTRO, y no se declaran
+# aqui: sus filas las monta este mismo bundle en la composicion del perfil
+# (`privacy-helmcode` publica `anonymize` y `workspace_read_anonymized`;
+# `retrieval-helmcode` publica `knowledge_search` e `index_workspace`), y una
+# herramienta registrada en la capa global es visible para toda sesion, incluida
+# la de este preset. Volver a montar esos dos plugins dentro del preset crearia
+# una SEGUNDA instancia del mapa de redaccion y una segunda fila con el mismo id;
+# lo que el preset decide es que herramientas ADICIONALES del turno se montan, y
+# recortar es no montarlas.
+#
+# RECORTE respecto de la lista de `standard`, con el motivo de cada uno:
+#
+#   - `tool-bash` y `tool-pwsh`: ejecutar ordenes no forma parte del trabajo con
+#     un expediente de cumplimiento, y abren un segundo camino a los bytes de un
+#     fichero que el flujo obligatorio de anonimizacion no gobierna.
+#   - `tool-jobs`: trabajos en segundo plano existen para ordenes largas; aqui no
+#     hay ninguna.
+#   - `command-goal`, `tool-goal` y el grupo `planning` (`plan-mode`):
+#     contabilidad de objetivos y modo de planificacion de tareas de ingenieria;
+#     una clasificacion de operaciones o un analisis DORA no es un plan de
+#     implementacion.
+#   - El grupo `delegation` entero (`tool-subagent-control`, `list-agents`,
+#     `subagent`, `subagent_fork`, `subagent_codex`, `subagent_claude_code`,
+#     `workflow-ptc`, `tool-workflow`, `tool-ralph`): cada subagente abre su
+#     propia sesion, su propio transcript y su propio turno contra el modelo. Un
+#     pack regulado mantiene un unico turno responsable y un unico mapa de
+#     redaccion.
+#   - `tool-web`: egreso a la web abierta. En `eu-only` la guardia ya veta
+#     `web_fetch` y `web_search` en `tools/pre-execute` (abren su propio trafico
+#     y no pasan por `llm/stream`); montar la herramienta solo ofreceria llamadas
+#     que se deniegan, y un analisis DORA cita la evidencia del workspace, no una
+#     fuente de internet que el asistente no puede leer.
+#   - `tool-plugin-manager`: instalar plugins muta la composicion; no es una
+#     capacidad de cumplimiento.
+#
+# LO QUE SE CONSERVA: `persona` (con el encuadre del sector y el limite de no dar
+# asesoramiento financiero ni juridico), `agent-instructions` (las instrucciones
+# del proyecto siguen contando), `tool-fs` y `tool-fs-search` (leer el workspace
+# con busqueda; escribir el informe), la instancia propia de `skill-filesystem`
+# con las dos skills del pack, `tool-skill` (invocarlas), el grupo `compaction`
+# (un expediente largo se compacta sin perder el hilo), `tool-ask-user`
+# (preguntar antes de suponer), `tool-todo` y `present` (entregar el informe como
+# fichero).
+- insert:
+    - id: preset-helmcode-banca
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: helmcode-banca
+        name: Banking (anonymized)
+        description: Banking compliance work whose every read goes through workspace_read_anonymized, restricted to the tools a regulated banking analyst needs.
+        order: 5
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: >-
+                You are a banking compliance documentation assistant powered by the {{model}} model. You classify operations, analyse DORA evidence and organise the file behind each finding; you do not give investment, tax or legal advice, you do not take a compliance decision on the entity's behalf, and you do not substitute the judgement of the compliance function or of the supervisor.
+              suffix: Your working directory is {{cwd}}.
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          # La instancia PROPIA del pack. Dos instancias de `skill-filesystem`
+          # conviven porque el registro indexa proveedores por nombre dentro de
+          # cada capa y esta lleva `providerName` propio, igual que las dos filas
+          # de `llm-pi-ai` de la capa Helmcode conviven con ids distintos.
+          # `bundledSkillDir` anade la raiz del pack en el rango 600 (`bundled`),
+          # que gana a una skill homonima de proyecto o de usuario y deja el flujo
+          # obligatorio fuera del alcance de cualquiera que lo reescriba; las
+          # raices por defecto siguen montadas, asi que las skills del proyecto y
+          # del operador no desaparecen de una sesion de banca.
+          - id: skill-filesystem-banca
+            name: '@deepseek-ai/dsh-skill-filesystem'
+            config:
+              providerName: banca
+              bundledSkillDir: !!js process.getBuiltinModule('node:path').join(process.getBuiltinModule('node:path').dirname(process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('@deepseek-ai/dsh-helmcode-banca/package.json')), 'skills')
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+              - id: command-compact
+                name: '@deepseek-ai/dsh-command-compact'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+          - id: present
+            name: '@deepseek-ai/dsh-tool-present'
