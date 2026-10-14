@@ -86,9 +86,13 @@ describe('helmcode sheet', () => {
     for (const url of urls) expect(url).toMatch(/^url\('\/fonts\/roboto[^']*\.woff2'\)$/u)
   })
 
-  it('swaps the lockup for the bare symbol on the derived light palette', () => {
-    expect(SHEET).toContain('.hc-brand-mark__lockup')
-    expect(SHEET).toContain('body[data-ds-dark-theme] .hc-brand-mark__lockup')
-    expect(SHEET).toContain('body[data-ds-dark-theme] .hc-brand-mark__symbol')
+  it('shows the lockup in both schemes — the kit ships a positive asset', () => {
+    // El kit trae logo-positivo (tinta negra) y logo-negativo (tinta blanca):
+    // la sede del brand no degrada al símbolo desnudo en claro, y el wordmark
+    // toma la tinta primaria del tema por currentColor.
+    expect(SHEET).toContain('.hc-brand-mark__lockup {\n  display: inline-flex')
+    expect(SHEET).toContain('.hc-brand-mark__symbol {\n  display: none')
+    expect(SHEET).toContain('color: var(--dsw-alias-label-primary)')
+    expect(SHEET).not.toContain('body[data-ds-dark-theme] .hc-brand-mark__lockup')
   })
 })

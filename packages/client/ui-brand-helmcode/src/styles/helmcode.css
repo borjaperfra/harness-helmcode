@@ -69,9 +69,11 @@ body [role='separator'] {
   border-color: var(--dsw-alias-border-l2);
 }
 
-/* Brand seat: the expanded row shows the negative lockup, which the kit only
- * provides for dark surfaces. On the derived light palette the mark degrades to
- * the bare symbol rather than shipping a wordmark the brand never defined. */
+/* Brand seat: the expanded row always shows the lockup. The kit only ships the
+ * negative (dark-surface) lockup; on the derived light palette the wordmark
+ * renders in the theme's primary ink while the symbol keeps its brand indigo —
+ * the owner asked for the logo in both schemes (the earlier fallback to the
+ * bare symbol hid it on light sessions). */
 .hc-brand-mark {
   display: inline-flex;
   align-items: center;
@@ -79,19 +81,12 @@ body [role='separator'] {
 }
 
 .hc-brand-mark__symbol {
-  display: inline-flex;
+  display: none;
   align-items: center;
 }
 
 .hc-brand-mark__lockup {
-  display: none;
-  align-items: center;
-}
-
-body[data-ds-dark-theme] .hc-brand-mark__symbol {
-  display: none;
-}
-
-body[data-ds-dark-theme] .hc-brand-mark__lockup {
   display: inline-flex;
+  align-items: center;
+  color: var(--dsw-alias-label-primary);
 }
