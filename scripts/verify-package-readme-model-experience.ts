@@ -160,6 +160,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/host/open-in-app': { kind: 'none', reason: 'Host routes opening desktop applications for a human; registers nothing model-facing.' },
   'packages/client/ui-open-in-app': { kind: 'none', reason: 'Browser-side split button opening the workspace directory for a human; registers nothing model-facing.' },
   'packages/bundle/base': { kind: 'indirect', reason: 'The bundle is a patch-list carrier; each inserted row\'s package owns its model-facing behavior.' },
+  'packages/client/ui-brand-helmcode': { kind: 'none', reason: 'Browser-side brand skin: it registers presentation tokens and a sheet and reaches no model request.' },
   'packages/bundle/headless': { kind: 'none', reason: 'The one-shot runner submits the task as an ordinary user message; prompts and tools belong to the composed base and headless bundles.' },
   'packages/llm/llm': { kind: 'none', reason: 'The adapter registry forwards already-assembled requests unchanged.' },
   'packages/llm/token-meter': { kind: 'indirect', reason: 'The measurement service leaves model-visible changes to its consumers.' },
@@ -183,7 +184,6 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/credentials/credentials-local': { kind: 'indirect', reason: 'The file/environment provider stores credential values; consumers of ctx.credentials own any model-facing behavior.' },
   'packages/credentials/authorization': { kind: 'none', reason: 'A configuration-time conversation with a human; no flow, notice, or prompt reaches a model request.' },
   'packages/util/atomic-write': { kind: 'none', reason: 'Pure filesystem write primitive; registers nothing model-facing.' },
-  'packages/session/session-telemetry': { kind: 'none', reason: 'The seam observes the session stream and hands redacted copies outward; it registers nothing model-facing.' },
   'packages/identity/anonymous-user-id': { kind: 'none', reason: 'The shared identifier reaches providers only as model-hidden HTTP metadata; it registers nothing model-facing.' },
   'packages/web/web-search-brave': { kind: 'indirect', reason: 'The provider backend delegates model rendering to dsh-tool-web.' },
   'packages/web/web-search-duckduckgo': { kind: 'indirect', reason: 'The provider backend delegates model rendering to dsh-tool-web.' },
@@ -223,6 +223,10 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/web/web-fetch-http': { kind: 'indirect', reason: 'The provider backend delegates model rendering to dsh-tool-web.' },
   'packages/web/web-search-exa': { kind: 'indirect', reason: 'The provider backend delegates model rendering to dsh-tool-web.' },
   'packages/workflow/workflow': { kind: 'indirect', reason: 'The service delegates parent and child model rendering to its consumer and engine.' },
+  'packages/bundle/helmcode': { kind: 'indirect', reason: 'The bundle is a patch carrier over the web composition; each inserted row\'s package owns its model-facing contribution.' },
+  'packages/host/compliance-evidence': { kind: 'none', reason: 'The generator runs outside any agent runtime, reading a configuration dump and writing a Markdown report.' },
+  'packages/llm/quota-helmcode': { kind: 'none', reason: 'A frozen limits table plus pure decision functions; the meter and any model-facing tool are consumers that arrive on top of it.' },
+  'packages/identity/identity-local': { kind: 'none', reason: 'Attribution is a log-only session event: the package registers no prompt, tool or model-visible surface.' },
 }
 
 interface Failure {

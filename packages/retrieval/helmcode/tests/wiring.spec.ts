@@ -89,9 +89,10 @@ function helmcodeDouble(options: {
   const statuses = options.embedStatuses ?? [200]
   let embeddings = 0
   const fetchImpl: typeof fetch = (input, init) => {
-    const url = String(input)
+    const url = input instanceof URL ? input.href : typeof input === 'string' ? input : input.url
     calls.push(url)
-    const body = JSON.parse(String(init?.body ?? '{}')) as {
+    const rawBody = init?.body
+    const body = JSON.parse(typeof rawBody === 'string' ? rawBody : '{}') as {
       input?: readonly string[]
       documents?: readonly string[]
     }

@@ -7,7 +7,7 @@ kind: "package-reference"
 
 ## Summary
 
-This package gives the Web client the Helmcode identity from a deployment's own composition, without editing the shipped design system. It registers one alias-token layer over the active theme — warm-black canvas, one-step surfaces, the indigo signal and the brand's severity hues, plus square corners and the two brand families — injects the sheet that carries the Roboto faces, and occupies the sidebar brand seats with the kit's own vector lockup. Choose it for deployments branded as Helmcode; a deployment without that identity leaves this package out of its roster. It has no runtime state and does not affect model requests.
+This package gives the Web client the Helmcode identity from its own composition, without editing the shipped design system. It registers one alias-token layer over the active theme — warm-black canvas, one-step surfaces, the indigo signal and the brand's severity hues, plus square corners and the two brand families — injects the sheet that carries the Roboto faces, and occupies the sidebar brand seats with the kit's own vector lockup. Choose it for deployments branded as Helmcode; a deployment without that identity leaves it out of its roster. It has no runtime state and does not affect model requests.
 
 ## Table of Contents
 

@@ -1138,6 +1138,34 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'identityLocal',
+    summary: 'Owns the deployment\'s local operator attribution: the durable log-only `identity/operator` event, the `operator` session projection, the `/operator` command, and the `ctx.identityLocal` read face the export and the evidence report use.',
+    description: 'Owns the deployment\'s local operator attribution: the durable log-only `identity/operator` event, the `operator` session projection, the `/operator` command, and the `ctx.identityLocal` read face the export and the evidence report use. Requires `ctx.sessionProjections`; the command child activates only when a command registry is composed.',
+    methods: [
+      {
+        signature: 'operator(session: Session): OperatorIdentity | undefined',
+        description: 'The operator one session is attributed to.',
+        parameters: [{ name: 'session', description: 'the session whose attribution is read.' }],
+        returns: 'the attributed operator and its instant, or `undefined` when the session has none (never recorded, or cleared by the log).',
+        throws: ['when the `operator` session projection is not registered.'],
+      },
+      {
+        signature: 'set(session: Session, name: string): boolean',
+        description: 'Record a session\'s operator as durable, log-only attribution. An empty or whitespace-only name records NOTHING (fail-soft: a caller gets no event carrying an empty operator instead of a broken attribution), and re-asserting the effective operator appends nothing, so the log keeps the instant of the change rather than of every click.',
+        parameters: [{ name: 'session', description: 'the session the attribution belongs to.' }, { name: 'name', description: 'the operator name to record.' }],
+        returns: '`true` when an `identity/operator` event was appended.',
+        throws: ['when the `operator` session projection is not registered.'],
+      },
+      {
+        signature: 'clear(session: Session): boolean',
+        description: 'Clear a session\'s attribution by RECORDING the clear, so the profile default cannot re-attribute a session the user un-attributed. A session with nothing attributed appends nothing.',
+        parameters: [{ name: 'session', description: 'the session to clear.' }],
+        returns: '`true` when the clearing `identity/operator` event was appended.',
+        throws: ['when the `operator` session projection is not registered.'],
+      },
+    ],
+  },
+  {
     key: 'inspector',
     summary: 'Shared Host/Client service façade over the realm\'s source publisher.',
     description: 'Shared Host/Client service façade over the realm\'s source publisher.',
@@ -1654,6 +1682,33 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Execute resolved inputs; program outcomes resolve as result fields.',
         parameters: [{ name: 'spec', description: 'directory, deadline, program, bindings, cancellation and supported policy.' }],
         returns: 'Captured output and the execution outcome.',
+      },
+    ],
+  },
+  {
+    key: 'retrieval',
+    summary: 'El seam `ctx.retrieval`: el indice local de recuperacion y las dos operaciones que lo usan, construidas sobre el nucleo puro con la clave resuelta por `ctx.credentials` y el `fetch` inyectado.',
+    description: 'El seam `ctx.retrieval`: el indice local de recuperacion y las dos operaciones que lo usan, construidas sobre el nucleo puro con la clave resuelta por `ctx.credentials` y el `fetch` inyectado.\n\nEl indice se abre PEREZOSAMENTE sobre `indexPath` y se cierra con el plugin. La clave NO se cachea: se resuelve al principio de cada operacion, asi que una clave rotada llega a la siguiente llamada sin reiniciar nada.',
+    methods: [
+      {
+        signature: 'count(): number',
+        description: 'Cuantos trozos guarda el indice local.',
+        parameters: [],
+        returns: 'el total de trozos indexados; 0 cuando aun no se ha indexado nada.',
+      },
+      {
+        signature: 'async indexSource(source: string, text: string): Promise<SourceIndexOutcome>',
+        description: 'Trocea, embebe y guarda un documento en el indice local.\n\nEl documento se REEMPLAZA entero: reindexar un fichero editado no deja sus trozos viejos compitiendo en la busqueda. Un documento sin texto utilizable es un no-op declarado —no se embebe nada, no se toca el indice y no se gasta ninguna peticion—, y la clave se resuelve ANTES de mirar el texto: sin clave esta operacion falla en vez de fingir que indexo.',
+        parameters: [{ name: 'source', description: 'nombre logico del documento, el que la busqueda cita.' }, { name: 'text', description: 'el documento completo.' }],
+        returns: 'los trozos guardados y las peticiones enviadas a Helmcode.',
+        throws: ['{RetrievalToolError} MISSING_CREDENTIAL sin clave utilizable, NO_TRANSPORT sin `globalThis.fetch`, o el codigo del nucleo (AUTH, CREDITS, RATE_LIMIT, PROVIDER, MALFORMED, DIMENSION) cuando Helmcode rechaza la llamada.'],
+      },
+      {
+        signature: 'async search(query: string, topN?: number): Promise<SearchOutcome>',
+        description: 'Ejecuta `embed → coseno → rerank` sobre el indice local.\n\nSin trozos indexados no hay recuperacion que hacer y no se manda nada: se DICE. Con trozos, la clave se resuelve antes de embeber la consulta, asi que un fallo de credencial sale como fallo y nunca como una lista vacia.',
+        parameters: [{ name: 'query', description: 'la consulta del usuario.' }, { name: 'topN', description: 'cuantos resultados devolver; ausente, el `topN` de la configuracion.' }],
+        returns: 'los trozos que tenia el indice y los resultados reranqueados.',
+        throws: ['{RetrievalToolError} MISSING_CREDENTIAL sin clave utilizable, NO_TRANSPORT sin `globalThis.fetch`, o el codigo del nucleo cuando Helmcode rechaza la llamada.'],
       },
     ],
   },
@@ -5603,6 +5658,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface OneShotSubagentDescriptorData extends SubagentDescriptorBase {\n    readonly mode: \'one-shot\';\n    readonly label?: string;\n}',
   },
   {
+    name: 'OperatorIdentity',
+    declaration: 'export interface OperatorIdentity {\n    operator: string;\n    since: string | null;\n}',
+  },
+  {
     name: 'OptionalSessionSeq',
     declaration: 'export type OptionalSessionSeq = SessionSeq | null;',
   },
@@ -6083,12 +6142,20 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SearchFileMatches {\n    path: string;\n    matches: SearchLineMatch[];\n}',
   },
   {
+    name: 'SearchHit',
+    declaration: 'export interface SearchHit {\n    readonly source: string;\n    readonly text: string;\n    readonly score: number;\n    readonly index: number;\n}',
+  },
+  {
     name: 'SearchLineMatch',
     declaration: 'export interface SearchLineMatch {\n    lineNumber: number;\n    line: string;\n}',
   },
   {
     name: 'SearchMatchesResultView',
     declaration: 'export interface SearchMatchesResultView {\n    card: \'search\';\n    shape: \'matches\';\n    title?: string;\n    files: SearchFileMatches[];\n    truncated: boolean;\n    total: number;\n}',
+  },
+  {
+    name: 'SearchOutcome',
+    declaration: 'export interface SearchOutcome {\n    readonly indexed: number;\n    readonly hits: readonly SearchHit[];\n}',
   },
   {
     name: 'SearchPathsResultView',
@@ -6757,6 +6824,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SkillViewOptions',
     declaration: 'export interface SkillViewOptions extends SkillLookupOptions {\n    readonly scope?: ScopeKey | undefined;\n}',
+  },
+  {
+    name: 'SourceIndexOutcome',
+    declaration: 'export interface SourceIndexOutcome {\n    readonly chunks: number;\n    readonly requests: number;\n}',
   },
   {
     name: 'SpawnTeammateRequest',

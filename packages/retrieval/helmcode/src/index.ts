@@ -611,7 +611,7 @@ export function apply(ctx: Context, config: Config = {}): void {
               source, path, status: 'indexed',
               chunks: outcome.chunks, requests: outcome.requests,
               detail: `${String(outcome.chunks)} chunk(s) embedded in ${String(outcome.requests)} request(s) to `
-                  + `${effective.baseURL}`,
+                  + effective.baseURL,
             })
         } catch (error) {
           // Un 401/402 no es un fallo "de esta fuente": la clave entera es

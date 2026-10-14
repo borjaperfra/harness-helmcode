@@ -66,5 +66,7 @@ One page per subsystem of the DeepSeek Harness: what it is, the data structures 
 | [sidebar-right.md](sidebar-right.md) | the right Sidebar: resource and navigation addresses, tab-type registration and routing, the `ctx.sidebarRight` navigation service, the pane-tab slots and owner props, the resource model, and the Workspace Files service |
 | [conversation.md](conversation.md) | target-neutral Session-event assembly: Context identity, Location data, replay paths, view builders, and target-owned render nodes |
 | [session-projection.md](session-projection.md) | the projection seam: `SessionProjectionMap`, the pure `ProjectionDefinition` unit, `ProjectionSnapshot`'s consistent cut, the change feed |
+| [retrieval.md](retrieval.md) | the local retrieval seam: the SQLite index behind `ctx.retrieval`, chunk/embed/replace indexing, embed → cosine → rerank search, and the `index_workspace`/`knowledge_search` tools |
+| [identity.md](identity.md) | local operator attribution: the `/operator` command, the durable log-only `identity/operator` event, the `operator` session projection and the `ctx.identityLocal` read face |
 
 > Type declarations and their JSDoc on these pages are source-equivalent and drift-checked by `pnpm run verify-type-equiv` (see [development.md](../development.md#documenting-types-verbatim-ts-type-equiv)). Ordinary blocks preserve complete declarations; `public-api` blocks preserve body-stripped public class declarations. Cordis services and events use each page's generated **Cordis API** section.

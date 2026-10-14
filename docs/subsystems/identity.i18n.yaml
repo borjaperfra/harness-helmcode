@@ -1,0 +1,13 @@
+# Bilingual-pair consistency record for identity.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Spanish blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/subsystems/identity.md
+/local-operator-identity:
+  en: 9416139f69c4a57e
+  es: 40e9f13c9eb890e0
+/local-operator-identity/what-the-seam-does:
+  en: f77c0bb6cebd14cc
+  es: c02a2cdfe40fa8c1
+/local-operator-identity/what-it-does-not-do:
+  en: 432b44ac2a2d2ffc
+  es: 7fd9515c27001614
