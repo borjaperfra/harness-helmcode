@@ -69,6 +69,54 @@ describe('helmcode token layer', () => {
       expect(modes.dark, `${name} dark`).not.toBe('')
     }
   })
+
+  it('fills user-authored bubbles with the brand indigo at low alpha', () => {
+    // El mismo token sirve al mensaje del usuario, al input de goal y a la
+    // respuesta de pregunta: las tres son superficies del usuario, no del
+    // asistente.
+    expect(HELMCODE_TOKENS['--dsw-specific-bubble']).toEqual({
+      dark: 'rgba(73, 52, 225, 0.12)',
+      light: 'rgba(73, 52, 225, 0.07)',
+    })
+    expect(HELMCODE_TOKENS['--dsw-specific-bubble-highlight']).toEqual({
+      dark: 'rgba(73, 52, 225, 0.18)',
+      light: 'rgba(73, 52, 225, 0.12)',
+    })
+  })
+
+  it('leaves the assistant on the neutral canvas', () => {
+    // El asistente no pinta superficie propia: su mensaje se lee sobre el fondo
+    // base, que sigue siendo el neutro de marca en los dos esquemas.
+    expect(HELMCODE_TOKENS['--dsw-alias-bg-base']).toEqual({ dark: '#0a0a0a', light: '#ffffff' })
+  })
+
+  it('accents inline code and the code-block banner, never the code body', () => {
+    expect(HELMCODE_TOKENS['--dsw-alias-markdown-inline-code']).toEqual({
+      dark: 'rgba(73, 52, 225, 0.20)',
+      light: 'rgba(73, 52, 225, 0.08)',
+    })
+    expect(HELMCODE_TOKENS['--dsw-alias-markdown-code-block-banner']).toEqual({
+      dark: 'rgba(73, 52, 225, 0.18)',
+      light: 'rgba(73, 52, 225, 0.07)',
+    })
+    expect(HELMCODE_TOKENS['--dsw-alias-markdown-code-block']).toEqual({ dark: '#111111', light: '#fafafa' })
+  })
+
+  it('tints with the brand indigo itself, never an invented purple', () => {
+    // rgb(73, 52, 225) es --dsw-alias-brand-primary (#4934e1): el acento es el
+    // del skin, no un morado nuevo.
+    expect(HELMCODE_TOKENS['--dsw-alias-brand-primary']?.dark).toBe('#4934e1')
+    for (const name of [
+      '--dsw-specific-bubble',
+      '--dsw-specific-bubble-highlight',
+      '--dsw-alias-markdown-inline-code',
+      '--dsw-alias-markdown-code-block-banner',
+    ]) {
+      for (const mode of ['light', 'dark'] as const) {
+        expect(HELMCODE_TOKENS[name]?.[mode], `${name} ${mode}`).toMatch(/^rgba\(73, 52, 225, 0\.\d+\)$/u)
+      }
+    }
+  })
 })
 
 describe('helmcode sheet', () => {
@@ -94,5 +142,21 @@ describe('helmcode sheet', () => {
     expect(SHEET).toContain('.hc-brand-mark__symbol {\n  display: none')
     expect(SHEET).toContain('color: var(--dsw-alias-label-primary)')
     expect(SHEET).not.toContain('body[data-ds-dark-theme] .hc-brand-mark__lockup')
+  })
+
+  it('accents quotes and reasoning traces through the hooks it documents', () => {
+    // El marcador de cita y la traza de razonamiento no tienen token propio: el
+    // skin se acopla a los hooks estables que publican los paquetes, y ese
+    // acoplamiento queda escrito en la hoja.
+    expect(SHEET).toContain('body [data-chat-flow] blockquote {')
+    expect(SHEET).toContain('border-left-color: var(--dsw-alias-brand-text);')
+    expect(SHEET).toContain("body [data-variant='think'] [data-disclosure-row],")
+    expect(SHEET).toContain("body [data-variant='think'] [class*='_markdown'] {")
+    expect(SHEET).toContain('color: var(--dsw-alias-brand-text);')
+  })
+
+  it('never invents an accent ink: the sheet only names theme tokens', () => {
+    expect(SHEET).not.toMatch(/#[0-9a-f]{3,8}\b/iu)
+    expect(SHEET).not.toMatch(/\brgba?\(/u)
   })
 })

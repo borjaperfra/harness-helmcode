@@ -90,3 +90,40 @@ body [role='separator'] {
   align-items: center;
   color: var(--dsw-alias-label-primary);
 }
+
+/* ---------------------------------------------------------------------------
+ * Message surfaces and their emphasis accents.
+ *
+ * Authorship: the user bubble needs no selector — `--dsw-specific-bubble`
+ * carries the brand indigo at low alpha in both schemes (see tokens.ts), the
+ * assistant publishes no fill of its own and so keeps the shipped neutral
+ * surface, and inline code plus the code-block banner are tokens too.
+ *
+ * The quote marker and the reasoning trace have no token between them: the
+ * renderer hard-wires the marker to the caption ink and the row to the
+ * tertiary ink. These two rules therefore reach the DOM, coupling this sheet
+ * to hooks the conversation packages publish:
+ *
+ *   [data-chat-flow]        the transcript column in ui-chat
+ *   [data-variant='think']  the reasoning disclosure row in ui-chat
+ *   [data-disclosure-row]   that row's own header in ui-primitives
+ *   [class*='_markdown']    the Markdown root, whose CSS-module class is
+ *                           `<hash>_<name>`, so only the suffix is stable
+ *
+ * No package outside this skin is edited. Each hook that disappears degrades
+ * the accent back to the shipped neutral ink and nothing else; the
+ * (0,2,1) specificity outranks the component's own rule without `!important`.
+ * ------------------------------------------------------------------------- */
+
+/* Quotes: the marker takes the accent, the quoted prose keeps the readable
+ * primary ink. */
+body [data-chat-flow] blockquote {
+  border-left-color: var(--dsw-alias-brand-text);
+}
+
+/* Reasoning traces: the header (icon, label, streaming summary) and the
+ * expanded trace prose. */
+body [data-variant='think'] [data-disclosure-row],
+body [data-variant='think'] [class*='_markdown'] {
+  color: var(--dsw-alias-brand-text);
+}

@@ -100,10 +100,14 @@ const DARK: Record<string, string> = {
 
   '--dsw-alias-markdown-citation': '#161616',
   '--dsw-alias-markdown-code-block': '#111111',
-  '--dsw-alias-markdown-code-block-banner': '#161616',
+  // Emphasis accents (corte B). The code-block banner is one of the places the
+  // accent budget belongs; the block body stays neutral so the code keeps the
+  // readable ink, and inline code is emphasis rather than surface, so its chip
+  // takes the same brand indigo at low alpha.
+  '--dsw-alias-markdown-code-block-banner': 'rgba(73, 52, 225, 0.18)',
   '--dsw-alias-markdown-code-segment-selected': '#161616',
   '--dsw-alias-markdown-code-segment-unselected': '#111111',
-  '--dsw-alias-markdown-inline-code': '#1c1c1c',
+  '--dsw-alias-markdown-inline-code': 'rgba(73, 52, 225, 0.20)',
   '--dsw-alias-markdown-placeholder': '#161616',
   '--dsw-alias-markdown-tag': '#161616',
 
@@ -150,8 +154,12 @@ const DARK: Record<string, string> = {
   '--dsw-specific-sidebar-nav-item-active': '#161616',
   '--dsw-specific-sidebar-nav-item-active-accent': 'rgba(73, 52, 225, 0.20)',
   '--dsw-specific-sidebar-nav-item-hover': '#111111',
-  '--dsw-specific-bubble': '#111111',
-  '--dsw-specific-bubble-highlight': '#1c1c1c',
+  // Authorship (corte B): user-authored bubbles — the chat user message, the
+  // goal command input, the question reply — carry the brand indigo at low
+  // alpha, while the assistant paints no surface of its own. Overriding the
+  // token rather than the components keeps every user surface on one ink.
+  '--dsw-specific-bubble': 'rgba(73, 52, 225, 0.12)',
+  '--dsw-specific-bubble-highlight': 'rgba(73, 52, 225, 0.18)',
   '--dsw-specific-input-major': '#111111',
   '--dsw-specific-login-input': '#111111',
   '--dsw-specific-tip': '#161616',
@@ -237,10 +245,10 @@ const LIGHT: Record<string, string> = {
 
   '--dsw-alias-markdown-citation': '#f5f5f5',
   '--dsw-alias-markdown-code-block': '#fafafa',
-  '--dsw-alias-markdown-code-block-banner': '#f5f5f5',
+  '--dsw-alias-markdown-code-block-banner': 'rgba(73, 52, 225, 0.07)',
   '--dsw-alias-markdown-code-segment-selected': '#ffffff',
   '--dsw-alias-markdown-code-segment-unselected': '#f5f5f5',
-  '--dsw-alias-markdown-inline-code': '#f5f5f5',
+  '--dsw-alias-markdown-inline-code': 'rgba(73, 52, 225, 0.08)',
   '--dsw-alias-markdown-placeholder': '#f5f5f5',
   '--dsw-alias-markdown-tag': '#f5f5f5',
 
@@ -287,8 +295,10 @@ const LIGHT: Record<string, string> = {
   '--dsw-specific-sidebar-nav-item-active': '#f0f0f0',
   '--dsw-specific-sidebar-nav-item-active-accent': 'rgba(73, 52, 225, 0.10)',
   '--dsw-specific-sidebar-nav-item-hover': '#f5f5f5',
-  '--dsw-specific-bubble': '#fafafa',
-  '--dsw-specific-bubble-highlight': '#f0f0f0',
+  // Light counterpart of the authorship tint: the same indigo, lower alpha, so
+  // the pale bubble still separates from the white canvas without a border.
+  '--dsw-specific-bubble': 'rgba(73, 52, 225, 0.07)',
+  '--dsw-specific-bubble-highlight': 'rgba(73, 52, 225, 0.12)',
   '--dsw-specific-input-major': '#ffffff',
   '--dsw-specific-login-input': '#fafafa',
   '--dsw-specific-tip': '#f5f5f5',
