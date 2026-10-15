@@ -12,10 +12,9 @@
   flex-direction: column;
   align-items: center;
   max-width: 640px;
-  /* Sin padding vertical propio: el shell del hero centra su stack, y un
-     padding aqui descentra el conjunto. El margen negativo compensa el gap del
-     shell para que el bloque suba al centro visual. */
-  margin: -12px 0 0;
+  /* Sin padding ni margen vertical propio: el centrado optico del conjunto lo
+     pone la hoja global del skin sobre el padre (sesgo hacia el centro real de
+     la pagina). Aqui solo la jerarquia tipografica. */
   padding: 0 16px;
   text-align: center;
 }
@@ -54,27 +53,9 @@
 }
 
 .sub {
-  margin: 0 0 26px;
+  margin: 0;
   font-family: 'Roboto', system-ui, sans-serif;
   font-size: 14px;
   line-height: 20px;
   color: var(--dsw-alias-label-secondary);
-}
-
-.models {
-  margin: 0;
-  font-family: 'Roboto Mono', ui-monospace, monospace;
-  font-size: 12px;
-  line-height: 22px;
-  color: var(--dsw-alias-label-secondary);
-}
-
-.models b {
-  font-weight: 500;
-  color: var(--dsw-alias-label-primary);
-}
-
-.models .sep {
-  padding: 0 8px;
-  color: var(--dsw-alias-label-tertiary);
 }

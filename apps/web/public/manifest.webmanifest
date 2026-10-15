@@ -1,6 +1,6 @@
 {
-  "name": "NaN Harness",
-  "short_name": "NaN",
+  "name": "Helmcode Harness",
+  "short_name": "Helmcode",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",

@@ -48,33 +48,13 @@ export type WelcomeHeroMarkProps = {
   className?: string | undefined
 }
 
-/**
- * Los cinco modelos de la ruta europea, en el orden en que se publican. GLM 5.3
- * va primero: es el add-on que la key del dueño tiene activado y el modelo que
- * usa por defecto. Van como constantes y no por el diccionario porque son
- * nombres propios del catalogo — identicos en es y en, como documentan los
- * tests del onboarding — y la clave del add-on todavia no existe en el
- * vocabulario del onboarding; migrar aqui es anadir esa clave alli.
- */
-const EU_MODELS = [
-  'GLM 5.3',
-  'DeepSeek V4.1 Flash',
-  'GLM 5.3 Flash',
-  'Qwen 3.6',
-  'Gemma 4',
-] as const
-
-/** La linea que describe la lista, para el nombre accesible del bloque. */
-const MODELS_LEAD = 'Cinco modelos de la ruta europea'
-
 /** El nombre completo del producto sobre el lockup: pide sitio por su cuenta. */
 const PRODUCT_NAME = 'Helmcode Harness'
 
 /**
  * Render the blank-session welcome surface.
  * @param props - owner share of the hero body seat plus the brand's dictionary.
- * @returns the product name, the brand lockup, the tagline, the proposition
- *   and the five models.
+ * @returns the product name, the brand lockup, the tagline and the proposition.
  */
 export function WelcomeHero({ t }: WelcomeHeroProps): ReactNode {
   void t
@@ -86,14 +66,6 @@ export function WelcomeHero({ t }: WelcomeHeroProps): ReactNode {
         <strong>{TAGLINE_STRONG}</strong> <span className={css.soft}>{TAGLINE_SOFT}</span>
       </p>
       <p className={css.sub}>{VALUE_PROPOSITION}</p>
-      <p className={css.models} aria-label={MODELS_LEAD}>
-        {EU_MODELS.map((model, index) => (
-          <span key={model}>
-            {index > 0 ? <span className={css.sep} aria-hidden="true"> / </span> : null}
-            <b>{model}</b>
-          </span>
-        ))}
-      </p>
     </section>
   )
 }

@@ -127,3 +127,23 @@ body [data-variant='think'] [data-disclosure-row],
 body [data-variant='think'] [class*='_markdown'] {
   color: var(--dsw-alias-brand-text);
 }
+
+/* ---------------------------------------------------------------------------
+ * Welcome optical centering.
+ *
+ * Upstream centers the WHOLE hero stack — welcome surface + workspace row +
+ * composer card — in the hero phase. The composer weighs ~220px at the stack's
+ * bottom, so the brand block rides visibly high: it reads as a top-aligned
+ * page, not a centered one.
+ *
+ * The bias: push the stack down so the BRAND BLOCK lands on the page's true
+ * vertical center, letting the composer fall below it the way a landing page
+ * puts its input under the fold's midpoint. The selector reaches the stack
+ * through its child — the welcome section is the skin's own `body
+ * div:has(> [data-helmcode-welcome])` hook — so no conversation class name is
+ * coupled; if the section unmounts, the rule stops matching and upstream
+ * centering resumes untouched.
+ * ------------------------------------------------------------------------- */
+body div:has(> [data-helmcode-welcome]) {
+  margin-top: clamp(48px, 14vh, 190px);
+}
