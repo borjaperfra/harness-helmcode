@@ -97,12 +97,13 @@ describe('decideModelRoute en modo eu-only', () => {
     }
   })
 
-  it('veta el add-on europeo que el bundle no declara, porque la tabla no es un catalogo', () => {
-    // `helmcode/glm5.3` es `eu` en el catalogo pero es un add-on de 150 EUR por
-    // key que el bundle deja fuera a proposito. No declararlo aqui es lo correcto:
-    // en eu-only se veta, que es el lado seguro del default-deny.
+  it('permite el add-on europeo: la prueba en vivo confirmo que la key lo sirve', () => {
+    // `helmcode/glm5.3` estuvo fuera a proposito cuando se asumio que la key
+    // del dueño no tenia el add-on activado; la llamada en vivo devolvio 200 y
+    // el medidor de cuota ya contaba consumo en el cubo Add-on GLM. La tabla lo
+    // declara `eu` y en eu-only pasa como los demas europeos.
     const verdict = decideModelRoute('eu-only', DEFAULT_RESIDENCY_TABLE, HELMCODE_PROVIDER, 'glm5.3')
-    expect(verdict.kind).toBe('deny')
+    expect(verdict).toEqual({ kind: 'allow' })
   })
 })
 
@@ -145,7 +146,7 @@ describe('decideModelRoute en modo ask', () => {
   })
 
   it('veta unknown y lo que no esta en la tabla: el default-deny sigue en pie', () => {
-    for (const model of ['modelo-desconocido', 'modelo-que-no-existe', 'glm5.3']) {
+    for (const model of ['modelo-desconocido', 'modelo-que-no-existe', 'qwen3-embedding']) {
       const verdict = decideModelRoute('ask', DEFAULT_RESIDENCY_TABLE, HELMCODE_PROVIDER, model)
       expect(verdict.kind, model).toBe('deny')
       if (verdict.kind !== 'deny') continue

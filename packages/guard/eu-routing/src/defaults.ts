@@ -7,15 +7,14 @@
  * de herramienta tampoco se inventan: cada uno lleva citado el fichero y la linea
  * del checkout donde consta.
  *
- * Alcance deliberado de la tabla de residencia: contiene exactamente los cuatro
- * modelos que el bundle declara hoy como ruta europea, las siete rutas
+ * Alcance deliberado de la tabla de residencia: contiene los cinco modelos que
+ * el bundle declara hoy como ruta europea (el add-on `glm5.3` entro cuando la
+ * prueba en vivo confirmo que la key del dueño lo sirve), las siete rutas
  * `nan-builders/*` que el dueño declaro europeas, mas los nueve frontera que
- * la misma clave sirve desde Estados Unidos. Todo lo demas —incluidos
- * `helmcode/glm5.3`, que el catalogo marca `eu` pero el bundle deja fuera a
- * proposito por ser add-on por key, y los modelos que no son de conversacion
- * (`qwen3-embedding`, `rerank`, `whisper`, `kokoro`, que no pasan por `llm/stream`)
- * — cae en el default-deny. Anadirlos aqui seria conceder un permiso que nadie
- * pidio.
+ * la misma clave sirve desde Estados Unidos. Todo lo demas —incluidos los
+ * modelos que no son de conversacion (`qwen3-embedding`, `rerank`, `whisper`,
+ * `kokoro`, que no pasan por `llm/stream`)— cae en el default-deny. Anadirlos
+ * aqui seria conceder un permiso que nadie pidio.
  *
  * @module @deepseek-ai/dsh-guard-eu-routing/defaults
  */
@@ -58,6 +57,7 @@ export const HELMCODE_PROVIDER = 'helmcode'
 export const DEFAULT_RESIDENCY_TABLE: ResidencyTable = Object.freeze({
   // Ruta europea declarada.
   'helmcode/deepseek-v4-flash': 'eu',
+  'helmcode/glm5.3': 'eu',
   'helmcode/glm5.3-flash': 'eu',
   'helmcode/qwen3.6': 'eu',
   'helmcode/gemma4': 'eu',
