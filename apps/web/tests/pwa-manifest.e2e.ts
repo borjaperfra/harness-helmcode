@@ -49,7 +49,8 @@ it('ships fixed-color favicons selected by document media queries', async () => 
   const light = await readFile(join(DIST_ROOT, 'favicon.svg'), 'utf8')
   const dark = await readFile(join(DIST_ROOT, 'favicon-dark.svg'), 'utf8')
   expect(light).not.toContain('<style>')
-  expect(light).toContain('fill="#000"')
-  expect(dark).toContain('fill="#fff"')
-  expect(dark.replace('fill="#fff"', 'fill="#000"')).toBe(light)
+  // Each scheme carries the brand kit's own artwork: the indigo symbol on the
+  // light scheme, the kit's white symbol on the dark one.
+  expect(light).toContain('fill="#4934E1"')
+  expect(dark).toContain('fill="#FFFFFF"')
 })

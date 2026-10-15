@@ -596,9 +596,9 @@ describe('Enter semantics', () => {
   })
 
   it('keeps the owning placeholder or ordinary guidance when whole-queue steering is unavailable', () => {
-    expect(bench({ running: true }).placeholder).toBe('Enviar un mensaje o ejecutar una tarea, / comandos, @ archivos o sesiones')
-    expect(bench({ queue: [row('q-1')] }).placeholder).toBe('Enviar un mensaje o ejecutar una tarea, / comandos, @ archivos o sesiones')
-    expect(bench({ running: true, queue: [row('q-1')], draft: 'mensaje' }).placeholder).toBe('Enviar un mensaje o ejecutar una tarea, / comandos, @ archivos o sesiones')
+    expect(bench({ running: true }).placeholder).toBe('Pregunta o encarga una tarea — inferencia europea, cero registros')
+    expect(bench({ queue: [row('q-1')] }).placeholder).toBe('Pregunta o encarga una tarea — inferencia europea, cero registros')
+    expect(bench({ running: true, queue: [row('q-1')], draft: 'mensaje' }).placeholder).toBe('Pregunta o encarga una tarea — inferencia europea, cero registros')
     expect(bench({
       running: true,
       queue: [row('q-1')],
@@ -610,7 +610,7 @@ describe('Enter semantics', () => {
       running: true,
       queue: [row('q-1')],
       commandMenuOpen: true,
-    }).placeholder).toBe('Enviar un mensaje o ejecutar una tarea, / comandos, @ archivos o sesiones')
+    }).placeholder).toBe('Pregunta o encarga una tarea — inferencia europea, cero registros')
     // The steer hint intentionally outranks the plan placeholder: while it
     // shows, the whole-queue gesture is genuinely available in plan mode.
     expect(bench({
@@ -1292,7 +1292,7 @@ describe('running and lock semantics', () => {
   it('disabled state shows the unavailable placeholder; custom placeholder wins', () => {
     expect(bench({ disabled: true }).placeholder).toBe('Sesión no disponible')
     const live = bench()
-    expect(live.placeholder).toBe('Enviar un mensaje o ejecutar una tarea, / comandos, @ archivos o sesiones')
+    expect(live.placeholder).toBe('Pregunta o encarga una tarea — inferencia europea, cero registros')
     const custom = bench({ placeholder: 'Custom placeholder' })
     expect(custom.placeholder).toBe('Custom placeholder')
   })
@@ -1339,7 +1339,7 @@ describe('running and lock semantics', () => {
     expect(entering.placeholder).toBe('Describir tu tarea para generar el plan')
     // Pending exit: target is default again.
     const leaving = bench({ plan: { active: true, pending: true } })
-    expect(leaving.placeholder).toBe('Enviar un mensaje o ejecutar una tarea, / comandos, @ archivos o sesiones')
+    expect(leaving.placeholder).toBe('Pregunta o encarga una tarea — inferencia europea, cero registros')
     // Owner placeholder outranks the plan swap.
     const custom = bench({ plan: { active: true, pending: false }, placeholder: 'Custom placeholder' })
     expect(custom.placeholder).toBe('Custom placeholder')

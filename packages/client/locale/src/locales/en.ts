@@ -33,7 +33,9 @@ export const en = {
   'collapse': 'Collapse',
   'expand': 'Expand',
   'back': 'Back',
-  'brand.localBuild': 'NaN Local Build',
+  // The shell's product title (ui-layout DocumentTitle) when the build embeds
+  // no DSH_CLIENT_TITLE: in this distribution the product is Helmcode.
+  'brand.localBuild': 'Helmcode',
   'workspace.defaultName': 'NaN: Quemando TOKENS 🔥',
   'unknown': 'Unknown',
   'none': 'None',

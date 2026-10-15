@@ -17,7 +17,10 @@ export const es = {
   'hint.goal': 'Describir el objetivo de una tarea de larga duración',
   'hint.goal.active': 'Objetivo activo: edit / pause / resume / clear',
   'placeholder.plan': PLAN_NEXT_ACTION_ES,
-  'placeholder.default': 'Enviar un mensaje o ejecutar una tarea, / comandos, @ archivos o sesiones',
+  // La voz de marca del despliegue Helmcode, que abre en español. La cadena
+  // inglesa se queda como estaba: el corpus registrado de instantáneas fija
+  // esa forma, y cambiarla obligaría a reescribir decenas de ficheros.
+  'placeholder.default': 'Pregunta o encarga una tarea — inferencia europea, cero registros',
   'placeholder.unavailable': 'Sesión no disponible',
   'placeholder.parentOffline': 'Sesión principal sin conexión; no se puede enviar, pero aún puedes detener la ejecución',
   'placeholder.hero': 'Describir lo que quieres construir, / comandos, @ archivos o sesiones',

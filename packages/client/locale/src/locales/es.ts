@@ -31,7 +31,9 @@ export const es = {
   'collapse': 'Contraer',
   'expand': 'Expandir',
   'back': 'Volver',
-  'brand.localBuild': 'Compilación local de NaN',
+  // El título de producto del shell (ui-layout DocumentTitle) cuando la
+  // compilación no incrusta DSH_CLIENT_TITLE: aquí el producto es Helmcode.
+  'brand.localBuild': 'Helmcode',
   'workspace.defaultName': 'NaN: Quemando TOKENS 🔥',
   'unknown': 'Desconocido',
   'none': 'Ninguno',
