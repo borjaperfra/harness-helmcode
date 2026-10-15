@@ -21,7 +21,7 @@
  */
 import type { ReactNode } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import { HelmcodeSymbol } from './Brand.tsx'
+import { HelmcodeLockup } from './Brand.tsx'
 import css from './WelcomeHero.module.css'
 
 /**
@@ -38,22 +38,14 @@ const TAGLINE_SOFT = 'not money.'
 /** La propuesta, con la formulacion que el dueño fijó ("Zero logs"). */
 const VALUE_PROPOSITION = 'Inferencia europea. Tarifa plana. Zero logs.'
 
-/** El simbolo del hero, con la geometria que el host pide. */
+/** El simbolo del hero, con la geometria que el host pide. RETIRADO: el asiento
+ * de marca del hero upstream se retiro junto con su titular, y la identidad la
+ * lleva el lockup del cuerpo. Migrado a HelmcodeLockup. */
 export type WelcomeHeroMarkProps = {
   /** Lado cuadrado pedido, en pixeles. */
   size: number
   /** Clase del host que conserva la geometria de la marca. */
   className?: string | undefined
-}
-
-/**
- * Ocupa el asiento de la marca del hero con el simbolo del kit, que es el mismo
- * dibujo que el rail de la barra lateral ya registra en `sidebar.brand.mark`.
- * @param props - lado pedido y clase del host.
- * @returns el hexagono isometrico de la marca.
- */
-export function HelmcodeHeroMark({ size, className }: WelcomeHeroMarkProps): ReactNode {
-  return <HelmcodeSymbol height={size} className={className} />
 }
 
 /**
@@ -78,13 +70,13 @@ const MODELS_LEAD = 'Cinco modelos de la ruta europea'
 /**
  * Render the blank-session welcome surface.
  * @param props - owner share of the hero body seat plus the brand's dictionary.
- * @returns the brand mark, the tagline, the proposition and the five models.
+ * @returns the brand lockup, the tagline, the proposition and the five models.
  */
 export function WelcomeHero({ t }: WelcomeHeroProps): ReactNode {
   void t
   return (
     <section className={css.root} data-helmcode-welcome="">
-      <HelmcodeSymbol height={32} className={css.mark} aria-hidden="true" />
+      <HelmcodeLockup height={30} className={css.lockup} aria-hidden="true" />
       <p className={css.headline}>
         <strong>{TAGLINE_STRONG}</strong> <span className={css.soft}>{TAGLINE_SOFT}</span>
       </p>

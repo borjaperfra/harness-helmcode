@@ -61,7 +61,7 @@ export function HelmcodeSymbol({ height, className }: { height: number; classNam
  * @param props - Requested lockup height in pixels.
  * @returns The symbol and wordmark as one vector.
  */
-function BrandLockup({ height }: { height: number }): ReactNode {
+export function HelmcodeLockup({ height, className }: { height: number; className?: string | undefined }): ReactNode {
   return (
     <svg
       width={(height * 546) / 103}
@@ -70,6 +70,7 @@ function BrandLockup({ height }: { height: number }): ReactNode {
       fill="none"
       role="img"
       aria-label="Helmcode"
+      className={className}
     >
       <path d={LOCKUP_WORDMARK_PATH} fill="currentColor" />
       <path fillRule="evenodd" clipRule="evenodd" d={LOCKUP_SYMBOL_PATH} fill="#4934E1" />
@@ -111,7 +112,7 @@ export function HelmcodeBrandMark({ size, placement }: SidebarBrandMarkOwnerProp
         <BrandSymbol height={size} />
       </span>
       <span className="hc-brand-mark__lockup">
-        <BrandLockup height={size} />
+        <HelmcodeLockup height={size} />
       </span>
     </span>
   )

@@ -3,7 +3,7 @@
 
 import type { ReactNode, RefObject } from 'react'
 import {
-  BRAND_MARK_PATH, BRAND_MARK_VIEWBOX, IconChevronDownOutlineRegular, IconFolderCloseRegular, IconFolderOpenRegular,
+  IconChevronDownOutlineRegular, IconFolderCloseRegular, IconFolderOpenRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { workspaceTitleOf } from '@deepseek-ai/dsh-util-workspace-path'
 import type { ConversationContentProps } from '../contract/slots.ts'
@@ -62,36 +62,22 @@ export function WorkspaceChip({ buttonRef, label, menuOpen = false, onClick, t }
 
 /** Hero chrome props. The workspace row rides the InputBar accessory hole, not here. */
 export interface HeroShellProps {
-  /** The owner's locale seat, passed down as a plain prop. */
+  /** The owner's locale seat, passed down as a plain prop. Unused since the
+      headline row retired: kept for API stability of the seat owner. */
   t: HeroTranslate
-  /** Authorized renderer for the hero brand-mark slot. */
+  /** Authorized renderer for the hero body slot. */
   renderSlot: ConversationContentProps['renderSlot']
   /** Overlay content after the stack (modals). */
   children?: ReactNode
 }
 
 /**
- * The hero NaN mark (34px square), static in the DOM. Hovering drifts it
- * gently — a pure CSS transform on the hitbox hover (HeroShell.module.css),
- * geometry-independent and gated on hover capability plus reduced motion, so
- * a slot-occupant mark floats the same way. Decorative — hidden from the
- * accessibility tree.
- * @returns the mark svg element.
+ * The hero NaN mark (34px square). RETIRED with the headline row: the body
+ * seat's brand surface carries the identity now. Removed from the tree; the
+ * upstream revert path re-adds this component plus the headline row above.
+ * Hover drift for it lived in HeroShell.module.css (.markHitbox/.mark) and
+ * stays there, harmless.
  */
-function HeroMark() {
-  return (
-    <svg
-      className={css.mark}
-      width={34}
-      height={(34 * BRAND_MARK_VIEWBOX.height) / BRAND_MARK_VIEWBOX.width}
-      viewBox={`${BRAND_MARK_VIEWBOX.x} ${BRAND_MARK_VIEWBOX.y} ${BRAND_MARK_VIEWBOX.width} ${BRAND_MARK_VIEWBOX.height}`}
-      fill="none"
-      aria-hidden="true"
-    >
-      <path d={BRAND_MARK_PATH} fill="currentColor" fillRule="evenodd" />
-    </svg>
-  )
-}
 
 /**
  * Render the hero chrome (headline only; no composer, no workspace row).
@@ -99,22 +85,18 @@ function HeroMark() {
  * @returns the centered hero element tree.
  */
 export function HeroShell({ t, renderSlot, children }: HeroShellProps) {
+  void t
   return (
     <div className={css.root}>
       <div className={css.stack}>
-        <div className={css.headline}>
-          {/* figma 34:10412: brand mark leading the headline, gap 10. */}
-          <span className={css.markHitbox}>
-            {renderSlot('conversation.hero.brand.mark', { size: 34, className: css.mark }, {
-              fallback: <HeroMark />,
-            })}
-          </span>
-          <span className={css.titleGroup}>
-            {/* Own element: keeps the headline text addressable apart from the badge. */}
-            <span>{t('hero.headline')}</span>
-            <span className={css.previewBadge}>{t('hero.preview')}</span>
-          </span>
-        </div>
+        {/* Helmcode fork: the upstream headline row (mark + 'hero.headline' +
+            'hero.preview' badge) is retired. The brand skin owns the whole hero
+            identity through the `conversation.hero.body` seat — lockup,
+            tagline, proposition and models — and two competing headlines plus
+            two brand marks read as a bug, not as a composition. The mark seat
+            above this body would duplicate the lockup the body already paints.
+            Reintroducing the row means reverting this removal, not adding code
+            here. */}
         <div className={css.body}>
           {/* Brand-owned welcome copy on the first screen of a new session; an
               absent occupant leaves this hole empty, as it always was. */}

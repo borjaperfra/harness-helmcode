@@ -1,16 +1,17 @@
 // @vitest-environment jsdom
 /**
- * La bienvenida de una sesion nueva: el simbolo del kit en el asiento de la
- * marca del hero, y — en el cuerpo — la pieza editorial: tagline a dos pesos,
- * propuesta con "Zero logs" y los cinco modelos de la ruta europea en mono.
- * La tagline y los nombres viajan como constantes: identidad y nombres
- * propios, no copy traducido.
+ * La bienvenida de una sesion nueva: la pieza editorial del cuerpo del hero.
+ * El lockup completo (simbolo + wordmark) abre, la tagline va a dos pesos, la
+ * propuesta fija "Zero logs" y los cinco modelos cierran en mono con GLM 5.3
+ * primero. La tagline y los nombres viajan como constantes: identidad y
+ * nombres propios, no copy traducido. El asiento de marca del hero upstream se
+ * retiro con su titular: el cuerpo es el unico dueno de la identidad.
  */
 
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
-import { HelmcodeHeroMark, WelcomeHero, type WelcomeHeroProps } from '../src/client/WelcomeHero.tsx'
+import { WelcomeHero, type WelcomeHeroProps } from '../src/client/WelcomeHero.tsx'
 import { en, es } from '../src/client/locales.ts'
 import css from '../src/client/WelcomeHero.module.css'
 
@@ -39,23 +40,18 @@ describe('Helmcode welcome surface', () => {
     expect(container.querySelectorAll(`.${css.sep}`)).toHaveLength(MODELS.length - 1)
   })
 
-  it('opens with the kit symbol in the body, indigo and untranslated', () => {
+  it('opens with the LOCKUP — symbol and wordmark, one identity', () => {
     const { container } = render(<WelcomeHero t={tEn} />)
-    const svg = container.querySelector('svg')
-    expect(svg?.getAttribute('viewBox')).toBe('0 0 115 145')
+    // Un solo svg: el lockup de 546x103, no el simbolo solo. Dos marcas (la del
+    // hero upstream y esta) leian como un fallo; por eso el cuerpo lleva la
+    // identidad entera.
+    const svgs = [...container.querySelectorAll('svg')]
+    expect(svgs).toHaveLength(1)
+    expect(svgs[0]?.getAttribute('viewBox')).toBe('0 0 546 103')
     expect(container.querySelector('path[fill="#4934E1"]')).not.toBeNull()
+    // El wordmark pinta por currentColor, no por un color fijo.
+    expect(container.querySelector('path[fill="currentColor"]')).not.toBeNull()
     // El mismo orden en ambos idiomas: son nombres propios, no copy.
     expect([...container.querySelectorAll(`.${css.models} b`)].map(node => node.textContent)).toEqual(MODELS)
-  })
-
-  it('carries the kit symbol into the hero mark seat', () => {
-    const { container } = render(<HelmcodeHeroMark size={34} className="host-mark" />)
-    const svg = container.querySelector('svg')
-    expect(svg?.getAttribute('viewBox')).toBe('0 0 115 145')
-    expect(svg?.getAttribute('height')).toBe('34')
-    // La clase del host viaja al svg, que es quien lleva la geometria del hero.
-    expect(svg?.getAttribute('class')).toBe('host-mark')
-    // El simbolo es indigo de marca y nunca se recolorea.
-    expect(container.querySelector('path[fill="#4934E1"]')).not.toBeNull()
   })
 })

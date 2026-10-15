@@ -23,17 +23,22 @@ const BRAND_PRIORITY = -10
 
 /**
  * The holes this skin fills, with how many occupants it puts in each.
- * `settings.onboarding` is the root step the panel takes; the utilities list
- * takes the residency chip and the quota card; the two `conversation.hero.*`
- * seats are the blank-session welcome (the kit's mark and the proposition line).
+ * `settings.onboarding` is the root step the panel takes, `settings.section` the
+ * read-only facts page; the utilities list takes the residency chip and the
+ * quota card; the two `conversation.hero.*` seats are the blank-session welcome
+ * (the kit's mark and the proposition line).
  */
 const HOLES = [
   { name: 'sidebar.brand.mark', kind: 'single', scope: 'root', occupants: 1 },
   { name: 'sidebar.brand.name', kind: 'single', scope: 'root', occupants: 1 },
-  { name: 'conversation.hero.brand.mark', kind: 'single', scope: 'root', occupants: 1 },
+  // El asiento de marca del hero upstream se retiro con su titular: no se
+  // declara aqui y el skin ya no lo ocupa.
   { name: 'conversation.hero.body', kind: 'single', scope: 'root', occupants: 1 },
+  // La portada de la cabecera: el lockup donde upstream no pone nada.
+  { name: 'conversation.header.leading', kind: 'single', scope: 'root', occupants: 1 },
   { name: 'conversation.session.header.utilities', kind: 'list', scope: 'session', occupants: 2 },
   { name: 'settings.onboarding', kind: 'list', scope: 'root', occupants: 1 },
+  { name: 'settings.section', kind: 'list', scope: 'root', occupants: 1 },
 ] as const
 
 interface CapturedOverride {
@@ -251,6 +256,28 @@ describe('helmcode brand skin plugin', () => {
     expect(subject.slots.entries('conversation.session.header.utilities')).toHaveLength(0)
   })
 
+  it('takes the Helmcode settings page and injects the deployment facts it shows', async () => {
+    const subject = await bench()
+    const fiber = subject.ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    const section = subject.slots.entries('settings.section')[0]
+    expect(section?.options.id).toBe('helmcode')
+    expect(section?.options.order).toBe(90)
+    expect(section?.locale).toBe(NS)
+    // La cara inyectada reune los hechos del despliegue: la clave por el
+    // namespace `credentials` y los dos hechos del host por el catalogo servido.
+    const face = (section?.inject as (() => {
+      apiKeyConfigured: () => Promise<boolean>
+      residencyPolicy: () => Promise<string | undefined>
+      redactionTtlDays: () => Promise<number | null | undefined>
+    }) | undefined)?.()
+    expect(await face?.apiKeyConfigured()).toBe(false)
+    expect(await face?.residencyPolicy()).toBe('eu-only')
+    expect(await face?.redactionTtlDays()).toBeUndefined()
+    await fiber.dispose()
+    expect(subject.slots.entries('settings.section')).toHaveLength(0)
+  })
+
   it('takes the residency chip seat beside the quota card and reads the policy it serves', async () => {
     const subject = await bench()
     const fiber = subject.ctx.plugin({ inject: [...inject], apply })
@@ -269,21 +296,18 @@ describe('helmcode brand skin plugin', () => {
     await fiber.dispose()
   })
 
-  it('takes the blank-session welcome seats: the kit mark and the proposition body', async () => {
+  it('takes the blank-session welcome body: the whole hero identity lives there', async () => {
     const subject = await bench()
     const fiber = subject.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    // La marca del hero se toma por debajo del ocupante de serie, como las
-    // celdas de la barra lateral: el asiento queda para el kit.
-    const mark = subject.slots.entries('conversation.hero.brand.mark')[0]
-    expect(mark?.options.priority).toBe(BRAND_PRIORITY)
-    // El cuerpo del hero es una linea de marca, no una accion: un solo ocupante
-    // con el diccionario de la marca enlazado.
+    // El asiento de marca del hero upstream se retiro con su titular (dos
+    // marcas y dos titulares leian como un fallo): el cuerpo es el unico
+    // ocupante de la identidad, con el diccionario de la marca enlazado.
+    expect(subject.slots.entries('conversation.hero.brand.mark')).toHaveLength(0)
     const body = subject.slots.entries('conversation.hero.body')[0]
     expect(body).toBeDefined()
     expect(body?.locale).toBe(NS)
     await fiber.dispose()
-    expect(subject.slots.entries('conversation.hero.brand.mark')).toHaveLength(0)
     expect(subject.slots.entries('conversation.hero.body')).toHaveLength(0)
   })
 

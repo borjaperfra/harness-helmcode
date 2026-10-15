@@ -23,14 +23,17 @@ import type { ResidencyPolicy } from '@deepseek-ai/dsh-api-session-controller/ty
 import type {} from '@deepseek-ai/dsh-quota-helmcode/types'
 import { HelmcodeBrandMark, HelmcodeBrandName } from './Brand.tsx'
 import { EuChip } from './EuChip.tsx'
+import { HelmcodeHeaderLeading } from './HeaderLeading.tsx'
 import type { HelmcodeCredentialFace } from './Onboarding.tsx'
 import { HelmcodeOnboarding } from './Onboarding.tsx'
 import { en, es, NS, type HelmcodeKey } from './locales.ts'
 import { PLUGIN_ID } from './plugin-id.ts'
 import { QuotaCard } from './QuotaCard.tsx'
+import type { HelmcodeSettingsFacts } from './SettingsSection.tsx'
+import { HelmcodeSettingsSection } from './SettingsSection.tsx'
 import { installHelmcodeStyles } from './styles.ts'
 import { HELMCODE_TOKENS } from './tokens.ts'
-import { HelmcodeHeroMark, WelcomeHero } from './WelcomeHero.tsx'
+import { WelcomeHero } from './WelcomeHero.tsx'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -77,6 +80,31 @@ export function credentialFace(ctx: ClientContext): HelmcodeCredentialFace {
 }
 
 /**
+ * Los hechos del despliegue que la seccion de Ajustes muestra.
+ *
+ * Todo se lee del host y NADA se escribe: el estado de la credencial por el
+ * namespace `credentials` (nunca su valor), y la politica de residencia y la
+ * retencion del mapa por el catalogo de modelos, que es donde el host sirve los
+ * hechos que el navegador no puede preguntar de otra forma.
+ * @param ctx - Client plugin context, whose remotes answer.
+ * @returns la cara que inyecta la seccion.
+ */
+export function deploymentFacts(ctx: ClientContext): HelmcodeSettingsFacts {
+  const policy = residencyPolicyFace(ctx)
+  return {
+    apiKeyConfigured: async () => {
+      const response = await ctx.remote.credentials.describe([API_KEY_REF])
+      return response.ok && response.value[API_KEY_REF]?.configured === true
+    },
+    residencyPolicy: policy,
+    redactionTtlDays: async () => {
+      const response = await ctx.remote.session.modelCatalog()
+      return response.ok ? response.value.redactionTtlDays : undefined
+    },
+  }
+}
+
+/**
  * La cara de lectura de la POLITICA de residencia del despliegue.
  *
  * El host sirve el modo efectivo de la guardia con el catalogo de modelos, que
@@ -110,18 +138,20 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.theme.overrideTokens(PLUGIN_ID, HELMCODE_TOKENS), 'ui-brand-helmcode: token layer')
   ctx.effect(() => ctx.locale.register(NS, { es, en }), 'ui-brand-helmcode: dictionaries')
   installHelmcodeStyles(ctx)
+  // Portada de la cabecera: el lockup en el hueco leading, que upstream deja
+  // vacio. Lee "Helmcode Harness" donde antes no habia nada.
+  ctx.slots.inject('conversation.header.leading', () => ctx.slots.register({
+    name: 'conversation.header.leading',
+    priority: BRAND_PRIORITY,
+  }, HelmcodeHeaderLeading))
   ctx.slots.inject('sidebar.brand.mark', () => ctx.slots.inject('sidebar.brand.name', function* () {
     yield ctx.slots.register({ name: 'sidebar.brand.mark', priority: BRAND_PRIORITY }, HelmcodeBrandMark)
     yield ctx.slots.register({ name: 'sidebar.brand.name', priority: BRAND_PRIORITY }, HelmcodeBrandName)
   }))
-  // Bienvenida de una sesion nueva: el simbolo del kit sustituye la marca
-  // generica del hero, y el cuerpo del hero lleva la propuesta de valor con los
-  // cuatro modelos europeos. Los dos asientos son raiz, asi que el skin los
-  // ocupa igual que las celdas de la barra lateral.
-  ctx.slots.inject('conversation.hero.brand.mark', () => ctx.slots.register({
-    name: 'conversation.hero.brand.mark',
-    priority: BRAND_PRIORITY,
-  }, HelmcodeHeroMark))
+  // Bienvenida de una sesion nueva: el cuerpo del hero lleva TODA la identidad
+  // de la marca — lockup, tagline, propuesta y los cinco modelos europeos. El
+  // asiento de marca del hero upstream se retiro con su titular (dos marcas y
+  // dos titulares leian como un fallo), asi que este skin ya no lo ocupa.
   ctx.slots.inject('conversation.hero.body', () => ctx.slots.register({
     name: 'conversation.hero.body',
     locale: NS,
@@ -145,6 +175,17 @@ export function apply(ctx: ClientContext): void {
     order: 50,
     locale: NS,
   }, QuotaCard))
+  // Ajustes: una seccion propia con los hechos del despliegue, de solo lectura.
+  // Va despues del onboarding (que es el paso que escribe la clave) y despues de
+  // las secciones de serie, porque describe el despliegue y no configura nada.
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
+    id: 'helmcode',
+    order: 90,
+    label: () => ctx.locale.bind(NS)('settings.nav'),
+    locale: NS,
+    inject: () => deploymentFacts(ctx),
+  }, HelmcodeSettingsSection))
   ctx.slots.inject('settings.onboarding', () => ctx.slots.register({
     name: 'settings.onboarding',
     id: 'helmcode-api-key',

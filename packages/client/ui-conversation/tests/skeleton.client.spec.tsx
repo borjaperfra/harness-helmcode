@@ -380,25 +380,16 @@ function mount(
 }
 
 describe('Hero chrome', () => {
-  it('renders the English preview badge through the hero locale seat', () => {
+  it('dispatches only the hero body seat: the headline row retired with the fork rebrand', () => {
+    // La fila del titular (marca + 'hero.headline' + badge) se retiro: la
+    // superficie de marca que ocupa el cuerpo lleva la identidad entera, y dos
+    // titulares leian como un fallo. El hueco de marca ya no se despacha.
     const renderSlot = vi.fn<HeroShellProps['renderSlot']>(() => null)
     const view = render(<HeroShell t={makeTranslate(en, commonEn)} renderSlot={renderSlot} />)
-    expect(view.getByText('Toward local inference')).toBeTruthy()
-    expect(view.getByText('Preview')).toBeTruthy()
-    // El hero ofrece dos huecos: la marca de la cabecera y el cuerpo donde una
-    // marca pone su bienvenida. Los dos se despachan, en ese orden.
-    expect(renderSlot).toHaveBeenCalledTimes(2)
-    expect(renderSlot.mock.calls.map(call => call[0])).toEqual([
-      'conversation.hero.brand.mark',
-      'conversation.hero.body',
-    ])
-    const brandMarkOwner = renderSlot.mock.calls[0]?.[1]
-    if (brandMarkOwner === undefined || !('size' in brandMarkOwner) || !('className' in brandMarkOwner)) {
-      throw new Error('hero brand-mark owner must provide size and className')
-    }
-    expect(brandMarkOwner.size).toBe(34)
-    expect(brandMarkOwner.className).toBeTypeOf('string')
-    expect(renderSlot.mock.calls[0]?.[2]?.fallback).toBeTruthy()
+    expect(view.queryByText('Toward local inference')).toBeNull()
+    expect(view.queryByText('Preview')).toBeNull()
+    expect(renderSlot).toHaveBeenCalledTimes(1)
+    expect(renderSlot.mock.calls.map(call => call[0])).toEqual(['conversation.hero.body'])
   })
 })
 
@@ -552,8 +543,9 @@ describe('ConversationRoot resident composer', () => {
     expect(b.view.queryByRole('tablist')).toBeNull()
     expect(b.slotCalls).not.toContain('conversation.session.header.utilities')
     expect(b.slotCalls).not.toContain('conversation.session.header.actions')
-    expect(b.view.getByText('Hacia la inferencia local')).toBeTruthy()
-    expect(b.view.getByText('Vista previa')).toBeTruthy()
+    // La fase hero ya no pinta el titular upstream (retirado con el fork
+    // rebrand): la sonda de fase es el hueco del cuerpo del hero.
+    expect(b.slotCalls).toContain('conversation.hero.body')
     expect(b.view.queryByTestId('view-chat')).toBeNull()
     // The same machine-backed textarea is live in the hero, and the
     // persistence mirror stays bound (ConversationSession mounts chrome-hidden
@@ -586,7 +578,8 @@ describe('ConversationRoot resident composer', () => {
     expect(conversationPhase(failed, EMPTY_CONVERSATION_SNAPSHOT)).toBe('engaging')
     const b = mount(failed, undefined, undefined, { summaryBlank: true })
     expect(b.view.container.querySelector('[data-phase]')?.getAttribute('data-phase')).toBe('active')
-    expect(b.view.queryByText('Hacia la inferencia local')).toBeNull()
+    // La fase activa no despacha el hueco del hero: es la sonda de fase ahora.
+    expect(b.slotCalls).not.toContain('conversation.hero.body')
   })
 
   it('settling phase: a summary that does not prove the session blank hides the composer while it opens', () => {
@@ -618,7 +611,9 @@ describe('ConversationRoot resident composer', () => {
     // blank the column for the history round-trip.
     const root = b.view.container.querySelector('[data-phase]')
     expect(root?.getAttribute('data-phase')).toBe('hero')
-    expect(b.view.getByText('Hacia la inferencia local')).toBeTruthy()
+    // La fase hero se sonda por el hueco del cuerpo (el titular upstream se
+    // retiro con el rebrand del fork).
+    expect(b.slotCalls).toContain('conversation.hero.body')
     expect(b.view.getByRole('textbox')).toBeTruthy()
   })
 
