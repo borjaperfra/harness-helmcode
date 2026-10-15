@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 /**
  * La bienvenida de una sesion nueva: el simbolo del kit en el asiento de la
- * marca del hero, y — en el cuerpo — una linea de propuesta de valor con los
- * cuatro modelos de la ruta europea. Los nombres salen del vocabulario del
- * onboarding, que es su unico dueno.
+ * marca del hero, y — en el cuerpo — la pieza editorial: tagline a dos pesos,
+ * propuesta con "Zero logs" y los cinco modelos de la ruta europea en mono.
+ * La tagline y los nombres viajan como constantes: identidad y nombres
+ * propios, no copy traducido.
  */
 
 import { afterEach, describe, expect, it } from 'vitest'
@@ -11,36 +12,40 @@ import { cleanup, render } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { HelmcodeHeroMark, WelcomeHero, type WelcomeHeroProps } from '../src/client/WelcomeHero.tsx'
 import { en, es } from '../src/client/locales.ts'
+import css from '../src/client/WelcomeHero.module.css'
 
 afterEach(cleanup)
 
 const t = makeTranslate(es) as WelcomeHeroProps['t']
 const tEn = makeTranslate(en) as WelcomeHeroProps['t']
 
-/** Los cuatro modelos de la ruta europea, en el orden en que se publican. */
-const MODELS = [
-  es['onboarding.model.helmcode/deepseek-v4-flash'],
-  es['onboarding.model.helmcode/glm5.3-flash'],
-  es['onboarding.model.helmcode/qwen3.6'],
-  es['onboarding.model.helmcode/gemma4'],
-]
+/** Los cinco modelos de la ruta europea, en el orden en que se publican. */
+const MODELS = ['GLM 5.3', 'DeepSeek V4.1 Flash', 'GLM 5.3 Flash', 'Qwen 3.6', 'Gemma 4']
 
 describe('Helmcode welcome surface', () => {
-  it('states the proposition and the four European models, and nothing else', () => {
+  it('carries the tagline, the proposition and the five European models', () => {
     const { container } = render(<WelcomeHero t={t} />)
     expect(container.querySelector('[data-helmcode-welcome]')).not.toBeNull()
-    expect(container.textContent).toContain(es['welcome.valueProposition'])
-    expect(container.textContent).toContain(es['welcome.models'])
-    const names = [...container.querySelectorAll('li')].map(node => node.textContent)
+    // La tagline es identidad y no viaja por el diccionario: es constante.
+    expect(container.textContent).toContain('Burn tokens,')
+    expect(container.textContent).toContain('not money.')
+    expect(container.textContent).toContain('Zero logs')
+    // Los modelos van en una linea mono con separadores, no en una lista. Los
+    // nombres de clase viajan por el objeto del CSS module: en runtime estan
+    // hasheados y un selector literal no los encuentra.
+    const names = [...container.querySelectorAll(`.${css.models} b`)].map(node => node.textContent)
     expect(names).toEqual(MODELS)
+    // Cuatro separadores para cinco modelos.
+    expect(container.querySelectorAll(`.${css.sep}`)).toHaveLength(MODELS.length - 1)
   })
 
-  it('speaks the English dictionary without retyping a model name', () => {
+  it('opens with the kit symbol in the body, indigo and untranslated', () => {
     const { container } = render(<WelcomeHero t={tEn} />)
-    expect(container.textContent).toContain(en['welcome.valueProposition'])
-    // El nombre de cada modelo es el mismo en los dos idiomas: es un nombre
-    // propio del catalogo, no copy traducido.
-    expect([...container.querySelectorAll('li')].map(node => node.textContent)).toEqual(MODELS)
+    const svg = container.querySelector('svg')
+    expect(svg?.getAttribute('viewBox')).toBe('0 0 115 145')
+    expect(container.querySelector('path[fill="#4934E1"]')).not.toBeNull()
+    // El mismo orden en ambos idiomas: son nombres propios, no copy.
+    expect([...container.querySelectorAll(`.${css.models} b`)].map(node => node.textContent)).toEqual(MODELS)
   })
 
   it('carries the kit symbol into the hero mark seat', () => {

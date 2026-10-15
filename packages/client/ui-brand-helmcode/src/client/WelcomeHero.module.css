@@ -1,54 +1,63 @@
 /*
- * La bienvenida de una sesion nueva. Discreta a proposito: una linea de
- * propuesta de valor en el tono primario, y los cuatro modelos europeos como
- * una lista de una sola fila que envuelve. Sin relleno de marketing y sin
- * gastar el acento fuerte (el indigo queda para el simbolo del kit, que ya lo
- * lleva en su propio arte).
+ * La bienvenida de una sesion nueva: la pieza editorial. El simbolo del kit a
+ * 32px abre, la tagline manda a dos pesos (fuerte para "Burn tokens,", fino
+ * para "not money."), la propuesta queda en tono secundario y los cinco modelos
+ * cierran en mono con separadores. Sin cajas: la jerarquia la da la
+ * tipografia. Esquinas a cero, y el indigo solo en el simbolo — el color de
+ * marca fuerte ya vive en el arte del kit.
  */
 
 .root {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 0 8px;
+  max-width: 640px;
+  padding: 32px 16px 8px;
   text-align: center;
 }
 
-.proposition {
-  margin: 0;
+.mark {
+  flex: none;
+  margin-bottom: 22px;
+}
+
+.headline {
+  margin: 0 0 12px;
+  font-family: 'Roboto', system-ui, sans-serif;
+  font-size: 38px;
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--dsw-alias-label-primary);
+}
+
+.headline .soft {
+  font-weight: 400;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.sub {
+  margin: 0 0 26px;
   font-family: 'Roboto', system-ui, sans-serif;
   font-size: 14px;
   line-height: 20px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.models {
+  margin: 0;
+  font-family: 'Roboto Mono', ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.models b {
   font-weight: 500;
   color: var(--dsw-alias-label-primary);
 }
 
-.modelsLead {
-  margin: 0;
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--dsw-alias-label-caption);
-}
-
-.models {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  justify-content: center;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.model {
-  padding: 1px 8px;
-  /* Esquinas a cero: la marca no redondea. */
-  border: 1px solid rgba(73, 52, 225, 0.25);
-  background: rgba(73, 52, 225, 0.08);
-  font-family: 'Roboto', system-ui, sans-serif;
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--dsw-alias-label-primary);
-  white-space: nowrap;
+.models .sep {
+  padding: 0 8px;
+  color: var(--dsw-alias-label-tertiary);
 }
