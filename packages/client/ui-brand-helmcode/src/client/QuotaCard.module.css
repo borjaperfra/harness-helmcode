@@ -1,35 +1,115 @@
 /*
- * La tarjeta de cuota. Superficie compacta de cabecera: rejilla de dos filas,
- * barra de progreso y hairlines; el color del estado sale del token layer.
+ * El chip de cuota y su popover. El chip es UNA linea del tamano de las otras
+ * utilidades de la cabecera (punto de estado, cubo, cifras, porcentaje): la
+ * tarjeta completa convertida en sopa de texto inline era el fallo. Esquinas a
+ * cero (marca), y el acento solo en el punto de estado y la barra.
  */
 
 .hc-quota {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 2px 12px;
-  align-items: baseline;
-  padding: 6px 10px;
-  border: 1px solid var(--dsw-alias-border-l1);
-  background: var(--dsw-alias-bg-layer-1);
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+
+.hc-quota__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   font-family: 'Roboto', system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-secondary);
+  cursor: default;
+  white-space: nowrap;
+}
+
+.hc-quota__chip:focus-visible {
+  outline: 1px solid var(--dsw-alias-brand-primary);
+  outline-offset: 2px;
+}
+
+.hc-quota__dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dsw-alias-state-idle-primary);
+}
+
+.hc-quota__dot.hc-quota__dot--ok {
+  background: var(--dsw-alias-state-success-primary);
+}
+
+.hc-quota__dot.hc-quota__dot--low {
+  background: var(--dsw-alias-state-warn-primary);
+}
+
+.hc-quota__dot.hc-quota__dot--exhausted {
+  background: var(--dsw-alias-state-error-primary);
+}
+
+.hc-quota__short {
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+}
+
+.hc-quota__count,
+.hc-quota__chipPercent,
+.hc-quota__rpm {
+  font-family: 'Roboto Mono', ui-monospace, monospace;
+}
+
+.hc-quota__chipPercent {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* El detalle: se monta por portal, asi que se coloca en coordenadas de ventana
+   y no lo recorta la barra. */
+.hc-quota__popover {
+  position: fixed;
+  z-index: 100;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 248px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-overlay);
+  box-shadow: var(--dsw-elevation-prominent);
+  font-family: 'Roboto', system-ui, sans-serif;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.hc-quota__popoverHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .hc-quota__eyebrow {
   font-family: 'Roboto Mono', ui-monospace, monospace;
   font-size: 10px;
   line-height: 14px;
-  color: var(--dsw-alias-label-secondary);
+  color: var(--dsw-alias-label-tertiary);
 }
 
 .hc-quota__title {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
-  line-height: 14px;
+  line-height: 16px;
   color: var(--dsw-alias-label-primary);
 }
 
 .hc-quota__figures {
-  grid-column: 1 / -1;
   display: inline-flex;
   align-items: baseline;
   gap: 8px;
@@ -39,16 +119,11 @@
   color: var(--dsw-alias-label-primary);
 }
 
-.hc-quota__bucket {
-  font-weight: 500;
-}
-
 .hc-quota__percent {
   color: var(--dsw-alias-label-secondary);
 }
 
 .hc-quota__bar {
-  grid-column: 1 / -1;
   display: block;
   height: 3px;
   background: var(--dsw-alias-border-l1);
@@ -69,7 +144,6 @@
 }
 
 .hc-quota__foot {
-  grid-column: 1 / -1;
   display: inline-flex;
   align-items: baseline;
   justify-content: space-between;
@@ -95,13 +169,11 @@
 }
 
 .hc-quota__rpm {
-  font-family: 'Roboto Mono', ui-monospace, monospace;
   color: var(--dsw-alias-label-secondary);
 }
 
 .hc-quota__notice {
-  grid-column: 1 / -1;
   font-size: 10px;
   line-height: 14px;
-  color: var(--dsw-alias-label-secondary);
+  color: var(--dsw-alias-label-tertiary);
 }
