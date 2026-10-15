@@ -5575,7 +5575,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelCatalog',
-    declaration: 'export interface ModelCatalog {\n    readonly default: ModelSelection;\n    readonly routableProviders: readonly string[];\n    readonly groups: readonly ModelProviderGroup[];\n    readonly failures: readonly ModelCatalogFailure[];\n}',
+    declaration: 'export interface ModelCatalog {\n    readonly default: ModelSelection;\n    readonly routableProviders: readonly string[];\n    readonly groups: readonly ModelProviderGroup[];\n    readonly failures: readonly ModelCatalogFailure[];\n    readonly residencyPolicy?: ResidencyPolicy;\n    readonly redactionTtlDays?: number | null;\n}',
   },
   {
     name: 'ModelCatalogFailure',
@@ -5976,6 +5976,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'RequestUserInput',
     declaration: 'export interface RequestUserInput {\n    readonly role: \'user\';\n    readonly content: UserMessage[\'content\'];\n    readonly id?: never;\n    readonly source?: never;\n}',
+  },
+  {
+    name: 'ResidencyPolicy',
+    declaration: 'export type ResidencyPolicy = \'eu-only\' | \'ask\' | \'open\';',
   },
   {
     name: 'ResolvedAlwaysRetryPolicy',

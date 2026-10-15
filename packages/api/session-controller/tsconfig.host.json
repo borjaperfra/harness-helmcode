@@ -37,6 +37,7 @@
     { "path": "../../jobs/jobs" },
     { "path": "../../fs/fs" },
     { "path": "../../guard/eu-routing" },
+    { "path": "../../guard/privacy-helmcode" },
     { "path": "../../llm/llm" },
     { "path": "../../util/deque" },
     { "path": "../../util/native-command" },

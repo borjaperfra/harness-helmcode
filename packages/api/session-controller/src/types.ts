@@ -201,6 +201,19 @@ export interface ModelCatalog {
    * ausencia, que es justo lo que el consumidor tiene que poder distinguir.
    */
   readonly residencyPolicy?: ResidencyPolicy
+  /**
+   * La RETENCION declarada del mapa de anonimizacion del despliegue, en dias.
+   *
+   * `undefined` cuando la composicion no monta el canal de redaccion; `null`
+   * cuando lo monta sin caducidad declarada (las entradas nuevas no caducan); un
+   * numero, los dias que el despliegue declara. Es la misma caducidad que ese
+   * canal aplica al redactar, leida de su seam, y no una copia suya en el
+   * navegador. Viaja con el catalogo por la misma razon que
+   * {@link ModelCatalog.residencyPolicy}: es el unico camino de lectura que la
+   * interfaz tiene de un hecho del host, y el panel de ajustes lo muestra sin
+   * escribir nada.
+   */
+  readonly redactionTtlDays?: number | null
 }
 
 /** One client-requested mutation of a still-pending queue item. */

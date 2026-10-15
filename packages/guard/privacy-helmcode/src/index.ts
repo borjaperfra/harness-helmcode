@@ -313,9 +313,11 @@ interface RedactionCount {
 
 /**
  * El contrato minimo del seam `privacy`: lo que un consumidor de fuera de este
- * plugin —hoy, `export_audit` de la recuperacion— necesita para tapar datos
+ * plugin —hoy, `export_audit` de la recuperacion y el catalogo de modelos, que
+ * sirve al navegador los hechos del despliegue— necesita para tapar datos
  * personales con el MISMO mapa sellado que usan las herramientas de aqui, sin
- * conocer ni el fichero ni la clave.
+ * conocer ni el fichero ni la clave, y para declarar la MISMA caducidad que ese
+ * mapa aplica.
  */
 export interface PrivacySeam {
   /**
@@ -327,6 +329,15 @@ export interface PrivacySeam {
    * que en las herramientas, y nunca devuelve el texto sin redactar.
    */
   redact(text: string): Promise<string>
+  /**
+   * La caducidad DECLARADA de las entradas nuevas del mapa, en dias.
+   *
+   * Es la misma que aplica `redact`: `undefined` cuando el despliegue no la
+   * declaro, y entonces las entradas no caducan. Se publica para que una
+   * superficie de solo lectura —la retencion que un operador tiene que poder
+   * leer— diga lo que el despliegue declara en vez de una copia suya.
+   */
+  readonly ttlDays?: number
 }
 
 declare module '@deepseek-ai/cordis' {
@@ -455,6 +466,7 @@ export function apply(ctx: Context, config: Config = {}): void {
   // nunca un texto sin redactar devuelto en silencio.
   ctx.provide('privacy', {
     redact: async (text: string) => (await redactThrough(store, text, ttlDays)).text,
+    ...ttlDays === undefined ? {} : { ttlDays },
   })
 
   // 0. El VETO de lecturas directas. Es una decision del HOST: la skill del pack

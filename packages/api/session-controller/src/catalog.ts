@@ -8,6 +8,10 @@ import type {} from '@deepseek-ai/dsh-settings'
 // projection of the live Host registry, and the guard decides the veto in this
 // same Host context.
 import type {} from '@deepseek-ai/dsh-guard-eu-routing'
+// Type-only: pulls the redaction channel's Context merge, which is what types
+// `ctx.get('privacy')` below and where the declared map retention is read. No
+// runtime edge: the privacy plugin decides the expiry in this same Host context.
+import type {} from '@deepseek-ai/dsh-privacy-helmcode'
 import type { LlmModelInfo } from '@deepseek-ai/dsh-llm'
 import type { Context } from '@deepseek-ai/cordis'
 import type {
@@ -41,6 +45,12 @@ export async function buildModelCatalog(
   // runs, which is exactly what the guard's `eu-only` veto denies. Asked once
   // per catalog, never per row.
   const guard = ctx.get('guardEuRouting')
+  // La retencion del mapa de anonimizacion la DECLARA el canal de redaccion, y
+  // se lee de su seam —el mismo que aplica esa caducidad al redactar—, no de una
+  // copia. `undefined` sin canal montado; `null` con el canal montado sin
+  // caducidad declarada.
+  const privacy = ctx.get('privacy')
+  const redactionTtlDays = privacy === undefined ? undefined : privacy.ttlDays ?? null
   const catalog = await Promise.all(providers.map(async (provider) => {
     try {
       const models = await ctx.llm.listModels(provider.id)
@@ -88,12 +98,13 @@ export async function buildModelCatalog(
     routableProviders: groups.map(group => group.id),
     groups,
     failures: catalog.flatMap(item => item.kind === 'failure' ? [item.failure] : []),
-    // La POLITICA del despliegue viaja con el catalogo porque es la unica via de
-    // lectura que la interfaz tiene del host: la guardia es un plugin de host y
-    // su configuracion no llega al navegador. Sin guardia montada el campo se
-    // omite, y quien prometa residencia europea se calla: la ausencia es una
-    // respuesta, no un modo por defecto.
+    // Los hechos del DESPLIEGUE viajan con el catalogo porque es la unica via de
+    // lectura que la interfaz tiene del host: la guardia y el canal de redaccion
+    // son plugins de host y su configuracion no llega al navegador. Sin guardia
+    // montada el modo se omite, y quien prometa residencia europea se calla: la
+    // ausencia es una respuesta, no un modo por defecto.
     ...guard === undefined ? {} : { residencyPolicy: guard.mode },
+    ...redactionTtlDays === undefined ? {} : { redactionTtlDays },
   }
 }
 

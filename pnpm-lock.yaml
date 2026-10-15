@@ -1328,6 +1328,9 @@ importers:
       '@deepseek-ai/dsh-permission-presets':
         specifier: workspace:*
         version: link:../../interaction/permission-presets
+      '@deepseek-ai/dsh-privacy-helmcode':
+        specifier: workspace:*
+        version: link:../../guard/privacy-helmcode
       '@deepseek-ai/dsh-remote-mock':
         specifier: workspace:*
         version: link:../../test-support/remote-mock

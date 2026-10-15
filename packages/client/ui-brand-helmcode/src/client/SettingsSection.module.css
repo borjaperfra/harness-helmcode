@@ -1,0 +1,58 @@
+/*
+ * La seccion de Ajustes de Helmcode: cuatro filas de hechos, sin controles.
+ * Rotulo y valor en una linea, la procedencia del hecho como segunda linea del
+ * valor en el tono de caption. Sin cajas ni tarjetas: la seccion ya vive dentro
+ * del panel de Ajustes.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-family: 'Roboto', system-ui, sans-serif;
+}
+
+.intro {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-caption);
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 10px;
+  /* Esquinas a cero: la marca no redondea. */
+  border: 1px solid rgba(73, 52, 225, 0.2);
+  background: rgba(73, 52, 225, 0.06);
+}
+
+.label {
+  flex: none;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.value {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+  text-align: right;
+}
+
+.note {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  color: var(--dsw-alias-label-caption);
+}

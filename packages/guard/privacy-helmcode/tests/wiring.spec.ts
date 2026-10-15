@@ -344,6 +344,13 @@ describe('el seam `privacy`', () => {
     expect((outcome as Error).message).toContain(`no credential is configured for ${KEY_REF}`)
     expect(String(outcome)).not.toContain(DNI)
   })
+
+  it('publica la caducidad DECLARADA, y la omite cuando el despliegue no la declara', async () => {
+    // Es el hecho que una superficie de solo lectura tiene que poder citar: la
+    // retencion que el canal aplica de verdad, leida de su propio seam.
+    expect(seamOf((await harness({ key: KEY, ttlDays: 30 })).ctx).ttlDays).toBe(30)
+    expect(seamOf((await harness({ key: KEY })).ctx).ttlDays).toBeUndefined()
+  })
 })
 
 describe('workspace_read_anonymized', () => {
