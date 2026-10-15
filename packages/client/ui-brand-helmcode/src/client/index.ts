@@ -23,7 +23,6 @@ import type { ResidencyPolicy } from '@deepseek-ai/dsh-api-session-controller/ty
 import type {} from '@deepseek-ai/dsh-quota-helmcode/types'
 import { HelmcodeBrandMark, HelmcodeBrandName } from './Brand.tsx'
 import { EuChip } from './EuChip.tsx'
-import { HelmcodeHeaderLeading } from './HeaderLeading.tsx'
 import type { HelmcodeCredentialFace } from './Onboarding.tsx'
 import { HelmcodeOnboarding } from './Onboarding.tsx'
 import { en, es, NS, type HelmcodeKey } from './locales.ts'
@@ -138,12 +137,9 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.theme.overrideTokens(PLUGIN_ID, HELMCODE_TOKENS), 'ui-brand-helmcode: token layer')
   ctx.effect(() => ctx.locale.register(NS, { es, en }), 'ui-brand-helmcode: dictionaries')
   installHelmcodeStyles(ctx)
-  // Portada de la cabecera: el lockup en el hueco leading, que upstream deja
-  // vacio. Lee "Helmcode Harness" donde antes no habia nada.
-  ctx.slots.inject('conversation.header.leading', () => ctx.slots.register({
-    name: 'conversation.header.leading',
-    priority: BRAND_PRIORITY,
-  }, HelmcodeHeaderLeading))
+  // RETIRADO el lockup en el hueco leading de la cabecera: con el de la barra
+  // lateral y el del hero eran tres logos en una pantalla. La barra lateral ya
+  // es la identidad permanente; el hero lleva el nombre completo.
   ctx.slots.inject('sidebar.brand.mark', () => ctx.slots.inject('sidebar.brand.name', function* () {
     yield ctx.slots.register({ name: 'sidebar.brand.mark', priority: BRAND_PRIORITY }, HelmcodeBrandMark)
     yield ctx.slots.register({ name: 'sidebar.brand.name', priority: BRAND_PRIORITY }, HelmcodeBrandName)

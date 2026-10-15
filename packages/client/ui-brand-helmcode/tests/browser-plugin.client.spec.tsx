@@ -32,10 +32,10 @@ const HOLES = [
   { name: 'sidebar.brand.mark', kind: 'single', scope: 'root', occupants: 1 },
   { name: 'sidebar.brand.name', kind: 'single', scope: 'root', occupants: 1 },
   // El asiento de marca del hero upstream se retiro con su titular: no se
-  // declara aqui y el skin ya no lo ocupa.
+  // declara aqui y el skin ya no lo ocupa. Y el hueco leading de la cabecera
+  // se queda VACIO a proposito: barra lateral + hero ya llevan la marca, y un
+  // tercer logo en una pantalla leia como saturacion.
   { name: 'conversation.hero.body', kind: 'single', scope: 'root', occupants: 1 },
-  // La portada de la cabecera: el lockup donde upstream no pone nada.
-  { name: 'conversation.header.leading', kind: 'single', scope: 'root', occupants: 1 },
   { name: 'conversation.session.header.utilities', kind: 'list', scope: 'session', occupants: 2 },
   { name: 'settings.onboarding', kind: 'list', scope: 'root', occupants: 1 },
   { name: 'settings.section', kind: 'list', scope: 'root', occupants: 1 },

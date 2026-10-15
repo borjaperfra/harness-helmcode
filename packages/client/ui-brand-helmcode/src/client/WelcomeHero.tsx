@@ -67,15 +67,20 @@ const EU_MODELS = [
 /** La linea que describe la lista, para el nombre accesible del bloque. */
 const MODELS_LEAD = 'Cinco modelos de la ruta europea'
 
+/** El nombre completo del producto sobre el lockup: pide sitio por su cuenta. */
+const PRODUCT_NAME = 'Helmcode Harness'
+
 /**
  * Render the blank-session welcome surface.
  * @param props - owner share of the hero body seat plus the brand's dictionary.
- * @returns the brand lockup, the tagline, the proposition and the five models.
+ * @returns the product name, the brand lockup, the tagline, the proposition
+ *   and the five models.
  */
 export function WelcomeHero({ t }: WelcomeHeroProps): ReactNode {
   void t
   return (
     <section className={css.root} data-helmcode-welcome="">
+      <p className={css.product}>{PRODUCT_NAME}</p>
       <HelmcodeLockup height={30} className={css.lockup} aria-hidden="true" />
       <p className={css.headline}>
         <strong>{TAGLINE_STRONG}</strong> <span className={css.soft}>{TAGLINE_SOFT}</span>

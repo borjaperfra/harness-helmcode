@@ -12,8 +12,22 @@
   flex-direction: column;
   align-items: center;
   max-width: 640px;
-  padding: 32px 16px 8px;
+  /* Sin padding vertical propio: el shell del hero centra su stack, y un
+     padding aqui descentra el conjunto. El margen negativo compensa el gap del
+     shell para que el bloque suba al centro visual. */
+  margin: -12px 0 0;
+  padding: 0 16px;
   text-align: center;
+}
+
+.product {
+  margin: 0 0 18px;
+  font-family: 'Roboto Mono', ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--dsw-alias-label-tertiary);
 }
 
 .lockup {
@@ -21,11 +35,11 @@
   /* El wordmark pinta por currentColor: la tinta primaria del tema, con el
      simbolo en el indigo fijo del kit. */
   color: var(--dsw-alias-label-primary);
-  margin-bottom: 26px;
+  margin-bottom: 30px;
 }
 
 .headline {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
   font-family: 'Roboto', system-ui, sans-serif;
   font-size: 38px;
   line-height: 1.08;
