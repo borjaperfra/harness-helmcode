@@ -24,11 +24,14 @@ const BRAND_PRIORITY = -10
 /**
  * The holes this skin fills. `settings.onboarding` is the root step the panel
  * takes; `conversation.session.header.utilities` is the session-scoped list the
- * quota card joins.
+ * quota card joins; the two `conversation.hero.*` seats are the blank-session
+ * welcome (the kit's mark and the proposition line).
  */
 const HOLES = [
   { name: 'sidebar.brand.mark', kind: 'single', scope: 'root' },
   { name: 'sidebar.brand.name', kind: 'single', scope: 'root' },
+  { name: 'conversation.hero.brand.mark', kind: 'single', scope: 'root' },
+  { name: 'conversation.hero.body', kind: 'single', scope: 'root' },
   { name: 'conversation.session.header.utilities', kind: 'list', scope: 'session' },
   { name: 'settings.onboarding', kind: 'list', scope: 'root' },
 ] as const
@@ -192,6 +195,24 @@ describe('helmcode brand skin plugin', () => {
     await fiber.dispose()
     expect(subject.slots.entries('settings.onboarding')).toHaveLength(0)
     expect(subject.slots.entries('conversation.session.header.utilities')).toHaveLength(0)
+  })
+
+  it('takes the blank-session welcome seats: the kit mark and the proposition body', async () => {
+    const subject = await bench()
+    const fiber = subject.ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    // La marca del hero se toma por debajo del ocupante de serie, como las
+    // celdas de la barra lateral: el asiento queda para el kit.
+    const mark = subject.slots.entries('conversation.hero.brand.mark')[0]
+    expect(mark?.options.priority).toBe(BRAND_PRIORITY)
+    // El cuerpo del hero es una linea de marca, no una accion: un solo ocupante
+    // con el diccionario de la marca enlazado.
+    const body = subject.slots.entries('conversation.hero.body')[0]
+    expect(body).toBeDefined()
+    expect(body?.locale).toBe(NS)
+    await fiber.dispose()
+    expect(subject.slots.entries('conversation.hero.brand.mark')).toHaveLength(0)
+    expect(subject.slots.entries('conversation.hero.body')).toHaveLength(0)
   })
 
   it('renders the bare symbol in the collapsed rail and the lockup in the expanded row', () => {

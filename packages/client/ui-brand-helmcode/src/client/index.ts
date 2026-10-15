@@ -1,8 +1,9 @@
 /**
  * Helmcode browser-brand plugin: registers the brand token layer, its own
  * locale namespace, injects the brand sheet, occupies the sidebar brand seats,
- * and mounts the two Helmcode surfaces that are not a brand cell: the quota
- * estimator card in the session header and the API-key onboarding step.
+ * and mounts the Helmcode surfaces that are not a brand cell: the welcome body
+ * of a new session (with the kit's mark on the hero), the quota estimator card
+ * in the session header and the API-key onboarding step.
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
@@ -26,6 +27,7 @@ import { PLUGIN_ID } from './plugin-id.ts'
 import { QuotaCard } from './QuotaCard.tsx'
 import { installHelmcodeStyles } from './styles.ts'
 import { HELMCODE_TOKENS } from './tokens.ts'
+import { HelmcodeHeroMark, WelcomeHero } from './WelcomeHero.tsx'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -83,6 +85,18 @@ export function apply(ctx: ClientContext): void {
     yield ctx.slots.register({ name: 'sidebar.brand.mark', priority: BRAND_PRIORITY }, HelmcodeBrandMark)
     yield ctx.slots.register({ name: 'sidebar.brand.name', priority: BRAND_PRIORITY }, HelmcodeBrandName)
   }))
+  // Bienvenida de una sesion nueva: el simbolo del kit sustituye la marca
+  // generica del hero, y el cuerpo del hero lleva la propuesta de valor con los
+  // cuatro modelos europeos. Los dos asientos son raiz, asi que el skin los
+  // ocupa igual que las celdas de la barra lateral.
+  ctx.slots.inject('conversation.hero.brand.mark', () => ctx.slots.register({
+    name: 'conversation.hero.brand.mark',
+    priority: BRAND_PRIORITY,
+  }, HelmcodeHeroMark))
+  ctx.slots.inject('conversation.hero.body', () => ctx.slots.register({
+    name: 'conversation.hero.body',
+    locale: NS,
+  }, WelcomeHero))
   // La tarjeta vive entre las utilidades de la cabecera de sesion porque es
   // persistente y de la sesion, no un aviso de fallo: `shell.quota-notice` es
   // para lo segundo.

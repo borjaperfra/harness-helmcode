@@ -1,0 +1,54 @@
+/*
+ * La bienvenida de una sesion nueva. Discreta a proposito: una linea de
+ * propuesta de valor en el tono primario, y los cuatro modelos europeos como
+ * una lista de una sola fila que envuelve. Sin relleno de marketing y sin
+ * gastar el acento fuerte (el indigo queda para el simbolo del kit, que ya lo
+ * lleva en su propio arte).
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  text-align: center;
+}
+
+.proposition {
+  margin: 0;
+  font-family: 'Roboto', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+}
+
+.modelsLead {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-caption);
+}
+
+.models {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.model {
+  padding: 1px 8px;
+  /* Esquinas a cero: la marca no redondea. */
+  border: 1px solid rgba(73, 52, 225, 0.25);
+  background: rgba(73, 52, 225, 0.08);
+  font-family: 'Roboto', system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-primary);
+  white-space: nowrap;
+}

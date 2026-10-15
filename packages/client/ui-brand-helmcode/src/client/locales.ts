@@ -55,6 +55,10 @@ export const es = {
   'onboarding.saveError': 'La clave no se pudo guardar',
   'onboarding.saved': 'Clave guardada',
   'onboarding.saving': 'Guardando…',
+  // Bienvenida: la primera pantalla de una sesion nueva. Una linea y la lista
+  // de los cuatro modelos de la ruta europea; nada mas.
+  'welcome.valueProposition': 'Inferencia europea. Tarifa plana. Cero registros.',
+  'welcome.models': 'Los cuatro modelos de la ruta europea',
   // Operador: a quien pertenece la sesion, para el export y el informe.
   'operator.session': 'Operador de la sesión',
   // Indice de recuperacion local.
@@ -86,6 +90,8 @@ export const en = {
   'quota.status.ok': 'In order',
   'quota.status.low': 'Running low',
   'quota.status.exhausted': 'Exhausted',
+  'welcome.valueProposition': 'European inference. Flat rate. Zero logs.',
+  'welcome.models': 'The four models of the European route',
   'operator.session': 'Session operator',
   'index.recovery': 'Recovery index',
   'index.workspace': 'Index workspace',

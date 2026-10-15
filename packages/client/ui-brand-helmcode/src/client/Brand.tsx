@@ -26,12 +26,13 @@ const LOCKUP_WORDMARK_PATH = 'M104.28 18.8H114.744V86H104.28V18.8ZM147.384 18.8H
 
 /**
  * Render the brand symbol at one square-edge request.
- * @param props - Requested height in pixels.
+ * @param props - Requested height in pixels and the host's own class, when it has one.
  * @returns The isometric hexagon.
  */
-function BrandSymbol({ height }: { height: number }): ReactNode {
+function BrandSymbol({ height, className }: { height: number; className?: string | undefined }): ReactNode {
   return (
     <svg
+      className={className}
       width={(height * 115) / 145}
       height={height}
       viewBox="0 0 115 145"
@@ -42,6 +43,17 @@ function BrandSymbol({ height }: { height: number }): ReactNode {
       <path fillRule="evenodd" clipRule="evenodd" d={SYMBOL_PATH} fill="#4934E1" />
     </svg>
   )
+}
+
+/**
+ * The kit's bare symbol, for a surface that is not the sidebar (the blank-session
+ * hero). Same artwork and same fixed brand indigo as the rail occupant, so both
+ * seats show one mark.
+ * @param props - Requested height in pixels and the host's own class, when it has one.
+ * @returns The isometric hexagon.
+ */
+export function HelmcodeSymbol({ height, className }: { height: number; className?: string | undefined }): ReactNode {
+  return <BrandSymbol height={height} className={className} />
 }
 
 /**

@@ -189,6 +189,12 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'conversation.hero.workspace': { kind: 'single'; scope: 'root'; owner: EmptyWorkspaceOwnerProps }
     /** Brand mark shown before the blank-session headline. */
     'conversation.hero.brand.mark': { kind: 'single'; scope: 'root'; owner: HeroBrandMarkOwnerProps }
+    /**
+     * The blank-session body, under the headline and above the Workspace row.
+     * An occupant owns what a brand wants said on the first screen of a new
+     * session; an absent contribution leaves the hero exactly as it was.
+     */
+    'conversation.hero.body': { kind: 'single'; scope: 'root'; owner: HeroBodyOwnerProps }
     /** Agent-preset control staged for a New Session. */
     'conversation.hero.agentPreset': { kind: 'single'; scope: 'session-maybe'; owner: HeroAgentPresetOwnerProps }
     /** Full-width entries above the composer card. */
@@ -234,6 +240,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
         'conversation.composer.bar': { kind: 'single'; scope: 'session-maybe' }
         'conversation.input.dock': { kind: 'list'; scope: 'session' }
         'conversation.hero.brand.mark': { kind: 'single'; scope: 'root' }
+        'conversation.hero.body': { kind: 'single'; scope: 'root' }
         'conversation.hero.workspace': { kind: 'single'; scope: 'root' }
         'conversation.hero.agentPreset': { kind: 'single'; scope: 'session-maybe' }
       }
@@ -447,6 +454,12 @@ export interface HeroBrandMarkOwnerProps {
   size: number
   /** Host class preserving the surrounding mark geometry. */
   className?: string | undefined
+}
+
+/** Owner share of the blank-session body: the seat supplies nothing. */
+export interface HeroBodyOwnerProps {
+  /** Marker field: the body owner props are intentionally empty. */
+  children?: never
 }
 
 /** Full props of the resident optional-Session Conversation shell. */

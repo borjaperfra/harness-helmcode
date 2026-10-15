@@ -385,8 +385,13 @@ describe('Hero chrome', () => {
     const view = render(<HeroShell t={makeTranslate(en, commonEn)} renderSlot={renderSlot} />)
     expect(view.getByText('Toward local inference')).toBeTruthy()
     expect(view.getByText('Preview')).toBeTruthy()
-    expect(renderSlot).toHaveBeenCalledOnce()
-    expect(renderSlot.mock.calls[0]?.[0]).toBe('conversation.hero.brand.mark')
+    // El hero ofrece dos huecos: la marca de la cabecera y el cuerpo donde una
+    // marca pone su bienvenida. Los dos se despachan, en ese orden.
+    expect(renderSlot).toHaveBeenCalledTimes(2)
+    expect(renderSlot.mock.calls.map(call => call[0])).toEqual([
+      'conversation.hero.brand.mark',
+      'conversation.hero.body',
+    ])
     const brandMarkOwner = renderSlot.mock.calls[0]?.[1]
     if (brandMarkOwner === undefined || !('size' in brandMarkOwner) || !('className' in brandMarkOwner)) {
       throw new Error('hero brand-mark owner must provide size and className')

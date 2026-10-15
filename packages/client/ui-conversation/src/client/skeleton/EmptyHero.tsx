@@ -116,6 +116,9 @@ export function HeroShell({ t, renderSlot, children }: HeroShellProps) {
           </span>
         </div>
         <div className={css.body}>
+          {/* Brand-owned welcome copy on the first screen of a new session; an
+              absent occupant leaves this hole empty, as it always was. */}
+          {renderSlot('conversation.hero.body', {})}
           {/* The composer remains mounted outside this component. */}
         </div>
       </div>
