@@ -15,11 +15,14 @@ import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 // Type-only: the 'conversation.session.header.utilities' and 'settings.onboarding' entries.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
-// Type-only: the ctx.remote Context merge and the credentials namespace.
+// Type-only: the ctx.remote Context merge, the credentials namespace, and the
+// served model catalog that carries the deployment's residency policy.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
+import type { ResidencyPolicy } from '@deepseek-ai/dsh-api-session-controller/types'
 // Type-only: the quotaEstimate projection key merge read by the card.
 import type {} from '@deepseek-ai/dsh-quota-helmcode/types'
 import { HelmcodeBrandMark, HelmcodeBrandName } from './Brand.tsx'
+import { EuChip } from './EuChip.tsx'
 import type { HelmcodeCredentialFace } from './Onboarding.tsx'
 import { HelmcodeOnboarding } from './Onboarding.tsx'
 import { en, es, NS, type HelmcodeKey } from './locales.ts'
@@ -36,8 +39,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-/** Services this plugin needs: the theme registry, the slot registry, dictionaries, and credentials. */
-export const inject = ['theme', 'slots', 'locale', 'remote', 'remote.credentials']
+/** Services this plugin needs: the theme registry, the slot registry, dictionaries, and the remotes it reads. */
+export const inject = ['theme', 'slots', 'locale', 'remote', 'remote.credentials', 'remote.session']
 
 /**
  * Rank below a shipped brand occupant, because the lowest priority renders in a
@@ -74,6 +77,32 @@ export function credentialFace(ctx: ClientContext): HelmcodeCredentialFace {
 }
 
 /**
+ * La cara de lectura de la POLITICA de residencia del despliegue.
+ *
+ * El host sirve el modo efectivo de la guardia con el catalogo de modelos, que
+ * es el unico camino de lectura que la interfaz tiene de un servicio del host.
+ * La lectura se comparte entre asientos y se reintenta si falla: un fallo de red
+ * no se cachea, pero una politica ausente SI es una respuesta (ninguna guardia
+ * montada, o un modo que no promete nada) y no se vuelve a preguntar.
+ * @param ctx - Client plugin context, whose `remote.session` answers.
+ * @returns el lector que inyectan los asientos de marca.
+ */
+export function residencyPolicyFace(ctx: ClientContext): () => Promise<ResidencyPolicy | undefined> {
+  let cached: Promise<ResidencyPolicy | undefined> | undefined
+  const read = async (): Promise<ResidencyPolicy | undefined> => {
+    const response = await ctx.remote.session.modelCatalog()
+    return response.ok ? response.value.residencyPolicy : undefined
+  }
+  return () => {
+    cached ??= read().catch(() => {
+      cached = undefined
+      return undefined
+    })
+    return cached
+  }
+}
+
+/**
  * Apply the Helmcode skin.
  * @param ctx - Client plugin context.
  */
@@ -97,6 +126,16 @@ export function apply(ctx: ClientContext): void {
     name: 'conversation.hero.body',
     locale: NS,
   }, WelcomeHero))
+  // El chip de residencia va DELANTE del de cuota (order 49): primero la promesa
+  // del despliegue y luego el consumo. Comparte la linea de utilidades con la
+  // tarjeta, pero se retira solo cuando la politica no garantiza la UE.
+  ctx.slots.inject('conversation.session.header.utilities', () => ctx.slots.register({
+    name: 'conversation.session.header.utilities',
+    id: 'helmcode-residency',
+    order: 49,
+    locale: NS,
+    inject: () => ({ residencyPolicy: residencyPolicyFace(ctx) }),
+  }, EuChip))
   // La tarjeta vive entre las utilidades de la cabecera de sesion porque es
   // persistente y de la sesion, no un aviso de fallo: `shell.quota-notice` es
   // para lo segundo.

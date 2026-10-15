@@ -216,6 +216,9 @@ describe('ctx.guardEuRouting: la cara de lectura', () => {
     expect(read?.residency('nan-builders', 'glm5.3')).toBe('eu')
     // ...y lo que la tabla no declara es 'unknown', no un permiso.
     expect(read?.residency('ajeno', 'lo-que-sea')).toBe('unknown')
+    // El modo de la cara de lectura es el EFECTIVO, el mismo que decide el veto:
+    // es lo que una promesa de residencia en la interfaz puede citar.
+    expect(read?.mode).toBe('eu-only')
   })
 
   it('se retira con el plugin: el servicio no sobrevive a su dueno (HMR)', async () => {
@@ -236,6 +239,7 @@ describe('ctx.guardEuRouting: la cara de lectura', () => {
     // La cara de lectura dice 'us' y no corta nada por si misma; el corte lo
     // hace el waterfall, que es el unico seam por el que pasa la llamada.
     expect(ctx.get('guardEuRouting')?.residency('helmcode', 'claude-opus-5-5')).toBe('us')
+    expect(ctx.get('guardEuRouting')?.mode).toBe('eu-only')
     expect(() => ctx.llm.stream(request('helmcode', 'claude-opus-5-5'))).toThrow(LlmError)
     expect(reached()).toBe(false)
   })

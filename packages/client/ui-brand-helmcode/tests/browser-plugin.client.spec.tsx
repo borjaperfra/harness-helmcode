@@ -22,18 +22,18 @@ afterEach(() => {
 const BRAND_PRIORITY = -10
 
 /**
- * The holes this skin fills. `settings.onboarding` is the root step the panel
- * takes; `conversation.session.header.utilities` is the session-scoped list the
- * quota card joins; the two `conversation.hero.*` seats are the blank-session
- * welcome (the kit's mark and the proposition line).
+ * The holes this skin fills, with how many occupants it puts in each.
+ * `settings.onboarding` is the root step the panel takes; the utilities list
+ * takes the residency chip and the quota card; the two `conversation.hero.*`
+ * seats are the blank-session welcome (the kit's mark and the proposition line).
  */
 const HOLES = [
-  { name: 'sidebar.brand.mark', kind: 'single', scope: 'root' },
-  { name: 'sidebar.brand.name', kind: 'single', scope: 'root' },
-  { name: 'conversation.hero.brand.mark', kind: 'single', scope: 'root' },
-  { name: 'conversation.hero.body', kind: 'single', scope: 'root' },
-  { name: 'conversation.session.header.utilities', kind: 'list', scope: 'session' },
-  { name: 'settings.onboarding', kind: 'list', scope: 'root' },
+  { name: 'sidebar.brand.mark', kind: 'single', scope: 'root', occupants: 1 },
+  { name: 'sidebar.brand.name', kind: 'single', scope: 'root', occupants: 1 },
+  { name: 'conversation.hero.brand.mark', kind: 'single', scope: 'root', occupants: 1 },
+  { name: 'conversation.hero.body', kind: 'single', scope: 'root', occupants: 1 },
+  { name: 'conversation.session.header.utilities', kind: 'list', scope: 'session', occupants: 2 },
+  { name: 'settings.onboarding', kind: 'list', scope: 'root', occupants: 1 },
 ] as const
 
 interface CapturedOverride {
@@ -71,10 +71,25 @@ async function bench(declare = true) {
     }),
     set: async () => ({ ok: true, value: undefined }),
   }
-  ctx.provide('remote', { credentials } as never)
+  // El catalogo servido: la unica via por la que la interfaz lee la politica de
+  // residencia del despliegue (el modo de la guardia lo resuelve el host).
+  const session = {
+    modelCatalog: async () => ({
+      ok: true,
+      value: {
+        default: { provider: 'helmcode', model: 'qwen3.6' },
+        routableProviders: ['helmcode'],
+        groups: [],
+        failures: [],
+        residencyPolicy: 'eu-only',
+      },
+    }),
+  }
+  ctx.provide('remote', { credentials, session } as never)
   // The credentials Remote namespace is its own service key, exactly as the
   // generated contribution registers it on the browser side.
   ctx.provide('remote.credentials', credentials as never)
+  ctx.provide('remote.session', session as never)
   const declareHoles = (): (() => void) => slots.register({
     name: 'root',
     children: Object.fromEntries(HOLES.map(hole => [hole.name, { kind: hole.kind, scope: hole.scope }])),
@@ -88,8 +103,47 @@ describe('helmcode brand skin plugin', () => {
     expect(hostApply).not.toThrow()
   })
 
-  it('declares the theme, slot, locale, and credentials services it uses', () => {
-    expect(inject).toEqual(['theme', 'slots', 'locale', 'remote', 'remote.credentials'])
+  it('declares the theme, slot, locale, and remote services it uses', () => {
+    expect(inject).toEqual(['theme', 'slots', 'locale', 'remote', 'remote.credentials', 'remote.session'])
+  })
+
+  it('reads the deployment residency policy from the served catalog, once per success', async () => {
+    const calls = vi.fn()
+    const ctx = new Context()
+    ctx.provide('remote', {
+      session: {
+        modelCatalog: async () => {
+          calls()
+          return { ok: true as const, value: { residencyPolicy: 'eu-only' as const } }
+        },
+      },
+    } as never)
+    const { residencyPolicyFace } = await import('../src/client/index.ts')
+    const face = residencyPolicyFace(ctx)
+    expect(await face()).toBe('eu-only')
+    // La segunda lectura sale del cache: el modo es politica del despliegue, no
+    // algo que cambie entre dos renders de la misma pagina.
+    expect(await face()).toBe('eu-only')
+    expect(calls).toHaveBeenCalledOnce()
+  })
+
+  it('retries after a failed policy read instead of caching the failure', async () => {
+    const ctx = new Context()
+    let attempt = 0
+    ctx.provide('remote', {
+      session: {
+        modelCatalog: async () => {
+          attempt += 1
+          if (attempt === 1) throw new Error('carrier lost')
+          return { ok: true as const, value: { residencyPolicy: 'eu-only' as const } }
+        },
+      },
+    } as never)
+    const { residencyPolicyFace } = await import('../src/client/index.ts')
+    const face = residencyPolicyFace(ctx)
+    // Un fallo no es una politica: se responde `undefined` y se reintenta.
+    expect(await face()).toBeUndefined()
+    expect(await face()).toBe('eu-only')
   })
 
   it('registers its own namespace under both languages and releases it with the fiber', async () => {
@@ -144,7 +198,7 @@ describe('helmcode brand skin plugin', () => {
     for (const hole of HOLES) expect(subject.slots.entries(hole.name), hole.name).toHaveLength(0)
     subject.declareHoles()
     await Promise.resolve()
-    for (const hole of HOLES) expect(subject.slots.entries(hole.name), hole.name).toHaveLength(1)
+    for (const hole of HOLES) expect(subject.slots.entries(hole.name), hole.name).toHaveLength(hole.occupants)
 
     await fiber.dispose()
     for (const hole of HOLES) expect(subject.slots.entries(hole.name), hole.name).toHaveLength(0)
@@ -156,7 +210,7 @@ describe('helmcode brand skin plugin', () => {
     for (const hole of HOLES) expect(subject.slots.entries(hole.name), hole.name).toHaveLength(0)
     subject.declareHoles()
     await Promise.resolve()
-    for (const hole of HOLES) expect(subject.slots.entries(hole.name), hole.name).toHaveLength(1)
+    for (const hole of HOLES) expect(subject.slots.entries(hole.name), hole.name).toHaveLength(hole.occupants)
   })
 
   it('mounts its own sheet and retracts it with the plugin', async () => {
@@ -180,8 +234,8 @@ describe('helmcode brand skin plugin', () => {
     await fiber.await()
     // La tarjeta va DESPUES de las utilidades que ya ocupaban el asiento: es un
     // indicador, no una accion.
-    const quota = subject.slots.entries('conversation.session.header.utilities')[0]
-    expect(quota?.options.id).toBe('helmcode-quota')
+    const quota = subject.slots.entries('conversation.session.header.utilities')
+      .find(entry => entry.options.id === 'helmcode-quota')
     expect(quota?.options.order).toBe(50)
     expect(quota?.locale).toBe(NS)
     // El paso se sirve desactivado por defecto y comprueba la credencial el
@@ -195,6 +249,24 @@ describe('helmcode brand skin plugin', () => {
     await fiber.dispose()
     expect(subject.slots.entries('settings.onboarding')).toHaveLength(0)
     expect(subject.slots.entries('conversation.session.header.utilities')).toHaveLength(0)
+  })
+
+  it('takes the residency chip seat beside the quota card and reads the policy it serves', async () => {
+    const subject = await bench()
+    const fiber = subject.ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    // El chip de residencia va DELANTE del de cuota en la misma fila: primero la
+    // promesa del despliegue, luego el consumo.
+    const entries = subject.slots.entries('conversation.session.header.utilities')
+    expect(entries.map(entry => entry.options.id)).toEqual(['helmcode-residency', 'helmcode-quota'])
+    const residency = entries[0]!
+    expect(residency.options.order).toBe(49)
+    expect(residency.locale).toBe(NS)
+    // La cara inyectada es la lectura de la politica, y es la misma que el host
+    // resuelve con el catalogo.
+    const face = (residency.inject as (() => { residencyPolicy: () => Promise<string | undefined> }) | undefined)?.()
+    expect(await face?.residencyPolicy()).toBe('eu-only')
+    await fiber.dispose()
   })
 
   it('takes the blank-session welcome seats: the kit mark and the proposition body', async () => {

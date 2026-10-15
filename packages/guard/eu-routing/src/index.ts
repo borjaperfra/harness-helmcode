@@ -181,7 +181,7 @@ export function apply(ctx: Context, config: Config = {}): void {
   //    modelos y viaja con cada modelo hasta la interfaz, de modo que la
   //    etiqueta que pinta el selector y el veredicto no pueden divergir. No
   //    decide nada; el veto sigue en los dos waterfalls.
-  ctx.provide('guardEuRouting', residencyReader(residency))
+  ctx.provide('guardEuRouting', residencyReader(residency, mode))
 
   // 1. Egreso por modelo: el waterfall `llm/stream` envuelve TODA llamada de
   //    streaming (`packages/llm/llm/src/index.ts:75`). Su docblock autoriza el

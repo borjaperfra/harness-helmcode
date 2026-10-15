@@ -1,0 +1,42 @@
+/*
+ * El chip de residencia: hermano del chip de cuota y del mismo tamano (una linea
+ * de la fila de utilidades). Mismo tinte de marca, esquinas a cero, y el unico
+ * acento fuerte es el punto verde: el color es el punto, no el texto.
+ */
+
+.chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  padding: 0 8px;
+  border: 1px solid rgba(73, 52, 225, 0.25);
+  background: rgba(73, 52, 225, 0.12);
+  font-family: 'Roboto', system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-primary);
+  cursor: default;
+  white-space: nowrap;
+}
+
+.chip:hover {
+  background: rgba(73, 52, 225, 0.18);
+}
+
+.dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dsw-alias-state-success-primary);
+}
+
+.label {
+  font-weight: 500;
+}
+
+.check {
+  color: var(--dsw-alias-state-success-primary);
+}

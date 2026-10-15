@@ -20,6 +20,10 @@ export const es = {
   'residency.eu': 'Residencia UE',
   'residency.us': 'Residencia EE. UU.',
   'residency.unknown': 'Residencia desconocida',
+  // La politica del despliegue, no la residencia de un modelo: es lo que el chip
+  // de la cabecera promete, y solo cuando la guardia corre en `eu-only`.
+  'residency.chip': 'UE',
+  'residency.chipTitle': 'Residencia europea: la guardia de este despliegue solo admite rutas con residencia en la UE',
   // Cuota: lo que cubre el plan y lo que se estima en local.
   'quota.plan': 'Cuota del plan',
   'quota.localEstimate': 'Estimación local',
@@ -79,6 +83,8 @@ export const en = {
   'residency.eu': 'EU residency',
   'residency.us': 'US residency',
   'residency.unknown': 'Unknown residency',
+  'residency.chip': 'EU',
+  'residency.chipTitle': 'European residency: this deployment\'s guard only admits routes with EU residency',
   'quota.plan': 'Plan quota',
   'quota.localEstimate': 'Local estimate',
   'quota.sota': 'SOTA',

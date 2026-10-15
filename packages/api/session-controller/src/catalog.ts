@@ -21,7 +21,9 @@ import type {
  *
  * Each model carries the residency the mounted guard declares for its route, so
  * the surface that renders a model reads the same declaration the veto decides
- * with instead of a second, browser-side copy of the table.
+ * with instead of a second, browser-side copy of the table. The catalog also
+ * carries the guard's effective MODE: the deployment's residency policy, which a
+ * surface that promises European residency needs and cannot read from a model.
  *
  * @param ctx - Host context carrying the live LLM registry and, optionally, the
  * residency guard's read face.
@@ -86,6 +88,12 @@ export async function buildModelCatalog(
     routableProviders: groups.map(group => group.id),
     groups,
     failures: catalog.flatMap(item => item.kind === 'failure' ? [item.failure] : []),
+    // La POLITICA del despliegue viaja con el catalogo porque es la unica via de
+    // lectura que la interfaz tiene del host: la guardia es un plugin de host y
+    // su configuracion no llega al navegador. Sin guardia montada el campo se
+    // omite, y quien prometa residencia europea se calla: la ausencia es una
+    // respuesta, no un modo por defecto.
+    ...guard === undefined ? {} : { residencyPolicy: guard.mode },
   }
 }
 

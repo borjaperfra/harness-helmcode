@@ -18,13 +18,24 @@
  * @module @deepseek-ai/dsh-guard-eu-routing/residency
  */
 
-import { declaredResidency, type Residency, type ResidencyTable } from './decisions.ts'
+import { declaredResidency, type Residency, type ResidencyMode, type ResidencyTable } from './decisions.ts'
 
 /**
- * El servicio `ctx.guardEuRouting`: lectura de residencia para la interfaz y los
- * diagnosticos. Un solo metodo, sin estado y sin decision.
+ * El servicio `ctx.guardEuRouting`: lectura de residencia y del modo efectivo
+ * para la interfaz y los diagnosticos. No tiene estado y no decide nada.
  */
 export interface GuardEuRouting {
+  /**
+   * El modo EFECTIVO de la guardia (el de la configuracion, o el defecto del
+   * paquete cuando el perfil no declara ninguno).
+   *
+   * Es la POLITICA del despliegue, no la residencia de una ruta: quien promete
+   * algo en la interfaz —por ejemplo que una sesion no sale de la UE— tiene que
+   * leerla de aqui, porque es el mismo valor que decide el veto. En `eu-only`
+   * hay una lista blanca cerrada; en `ask` y `open` el despliegue NO garantiza
+   * esa promesa, y quien la pinte tiene que callarse.
+   */
+  readonly mode: ResidencyMode
   /**
    * Residencia declarada de una ruta de modelo.
    * @param provider - el id del proveedor de la ruta, tal como lo registra el harness.
@@ -35,19 +46,23 @@ export interface GuardEuRouting {
 }
 
 /**
- * Construye la cara de lectura sobre una tabla de residencia concreta.
+ * Construye la cara de lectura sobre una tabla de residencia y el modo efectivo
+ * de la guardia.
  *
- * Quien la publique decide QUE tabla lee; el plugin publica la EFECTIVA (los
- * valores por defecto mas lo que sume la configuracion del perfil), que es la
- * que decide el veto y la que el host pregunta al servir el catalogo de modelos.
- * No hay cara de navegador: el Loader del navegador crea cada entrada sin
- * configuracion, asi que una copia alli solo podria contradecir al host.
+ * Quien la publique decide QUE tabla y QUE modo lee; el plugin publica los
+ * EFECTIVOS (los valores por defecto mas lo que sume la configuracion del
+ * perfil), que son los que deciden el veto y los que el host pregunta al servir
+ * el catalogo de modelos. No hay cara de navegador: el Loader del navegador crea
+ * cada entrada sin configuracion, asi que una copia alli solo podria contradecir
+ * al host.
  *
  * @param table - la lista blanca de residencia por `provider/model`.
+ * @param mode - el modo efectivo declarado por el despliegue.
  * @returns el objeto que se publica como `ctx.guardEuRouting`.
  */
-export function residencyReader(table: ResidencyTable): GuardEuRouting {
+export function residencyReader(table: ResidencyTable, mode: ResidencyMode): GuardEuRouting {
   return {
+    mode,
     residency: (provider, model) => declaredResidency(table, provider, model),
   }
 }

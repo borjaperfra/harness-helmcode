@@ -168,6 +168,19 @@ export interface ModelCatalogFailure {
   readonly message: string
 }
 
+/**
+ * El modo efectivo de la guardia de residencia, en el vocabulario que declara
+ * `@deepseek-ai/dsh-guard-eu-routing` (`ResidencyMode`).
+ *
+ * Se repite como union literal a proposito: este modulo es la cara que el
+ * navegador compila, y el paquete de la guardia es host. Un `import type` suyo
+ * aqui arrastraria al programa del cliente un proyecto que no tiene mitad de
+ * navegador desde que el catalogo sirve la residencia; la union es de tres
+ * valores y el unico escritor del campo es el propio host, que si lee el tipo
+ * real de la guardia.
+ */
+export type ResidencyPolicy = 'eu-only' | 'ask' | 'open'
+
 /** Host-generation model catalog and the default used by unconfigured Sessions. */
 export interface ModelCatalog {
   readonly default: ModelSelection
@@ -175,6 +188,19 @@ export interface ModelCatalog {
   readonly routableProviders: readonly string[]
   readonly groups: readonly ModelProviderGroup[]
   readonly failures: readonly ModelCatalogFailure[]
+  /**
+   * La POLITICA de residencia del despliegue: el modo efectivo de la guardia
+   * montada, resuelto en el host al servir el catalogo, o ausente cuando la
+   * composicion no monta guardia.
+   *
+   * No es la residencia de un modelo (esa viaja en `ModelCatalogModel.residency`)
+   * ni se deduce del modelo elegido: es lo que el despliegue garantiza, y por eso
+   * una superficie que prometa residencia europea —el chip de la cabecera, el
+   * panel de ajustes— la lee de aqui y se calla cuando el modo no es `eu-only`.
+   * `'unknown'` no existe en este campo: sin guardia no hay promesa, hay
+   * ausencia, que es justo lo que el consumidor tiene que poder distinguir.
+   */
+  readonly residencyPolicy?: ResidencyPolicy
 }
 
 /** One client-requested mutation of a still-pending queue item. */
